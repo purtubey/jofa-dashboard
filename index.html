@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JOFA Porcinos - Panel de Gestion Productiva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-0: #08090c;
+  --bg-1: #111318;
+  --bg-2: #191c24;
+  --bg-3: #22262f;
+  --bg-4: #2a2f3a;
+  --blue: #4f7df5;
+  --blue-dim: #3a5fc0;
+  --blue-glow: rgba(79,125,245,0.15);
+  --green: #2ecc8b;
+  --green-dim: rgba(46,204,139,0.15);
+  --red: #e85d5d;
+  --red-dim: rgba(232,93,93,0.15);
+  --yellow: #f0c040;
+  --text-0: #ffffff;
+  --text-1: #c8cdd6;
+  --text-2: #8a919e;
+  --text-3: #555b67;
+  --border: #2a2f3a;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+html { font-size: 14px; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg-0);
+  color: var(--text-1);
+  min-height: 100vh;
+  min-width: 1200px;
+}
+/* HEADER */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px;
+}
+.header-brand { display: flex; align-items: baseline; gap: 12px; }
+.header-brand h1 {
+  font-size: 1.15rem; font-weight: 800; color: var(--text-0);
+  letter-spacing: 2px; text-transform: uppercase;
+}
+.header-brand span {
+  font-size: 0.75rem; font-weight: 400; color: var(--text-2);
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.header-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.75rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3);
+}
+.status-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+/* TABS */
+.tabs {
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  display: flex; gap: 0;
+}
+.tab-btn {
+  background: none; border: none; color: var(--text-2);
+  font-family: inherit; font-size: 0.78rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px;
+  padding: 12px 20px; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.tab-btn:hover { color: var(--text-1); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* MAIN */
+.main { padding: 28px 32px; }
+.page { display: none; }
+.page.active { display: block; }
+
+/* SECTION */
+.section { margin-bottom: 32px; }
+.section-title {
+  font-size: 0.72rem; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 1.5px;
+  margin-bottom: 16px;
+}
+
+/* KPI GRID */
+.kpi-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.kpi-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color 0.2s;
+}
+.kpi-card:hover { border-color: var(--bg-4); }
+.kpi-label {
+  font-size: 0.68rem; font-weight: 600; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.kpi-value {
+  font-size: 1.85rem; font-weight: 700; color: var(--text-0);
+  line-height: 1.1;
+}
+.kpi-value.loading { color: var(--text-3); }
+.kpi-bench {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.7rem; color: var(--text-2);
+}
+.kpi-bench .pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 0.65rem; font-weight: 600;
+}
+.pill.good { background: var(--green-dim); color: var(--green); }
+.pill.bad { background: var(--red-dim); color: var(--red); }
+.pill.neutral { background: var(--bg-3); color: var(--text-2); }
+.kpi-trend { font-size: 0.68rem; color: var(--text-3); }
+
+/* TABLE */
+.table-wrap {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.table-wrap table { width: 100%; border-collapse: collapse; }
+.table-wrap th {
+  font-size: 0.68rem; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 1px;
+  text-align: left; padding: 12px 16px;
+  background: var(--bg-3);
+  border-bottom: 1px solid var(--border);
+}
+.table-wrap td {
+  font-size: 0.82rem; color: var(--text-1);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.table-wrap tr:last-child td { border-bottom: none; }
+.table-wrap tr:hover td { background: rgba(79,125,245,0.04); }
+
+.table-empty {
+  padding: 40px; text-align: center;
+  color: var(--text-3); font-size: 0.85rem;
+}
+
+/* CHART CONTAINER */
+.chart-box {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.chart-title {
+  font-size: 0.72rem; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+/* CONFIG */
+.config-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.config-card h3 {
+  font-size: 0.85rem; font-weight: 700; color: var(--text-0);
+  margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.config-card p { font-size: 0.82rem; color: var(--text-2); line-height: 1.6; margin-bottom: 8px; }
+.config-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0; font-size: 0.82rem;
+}
+.config-label { color: var(--text-2); min-width: 140px; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; }
+.config-val { color: var(--text-1); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; }
+.btn {
+  background: var(--blue); color: #fff; border: none;
+  font-family: inherit; font-size: 0.78rem; font-weight: 600;
+  padding: 10px 20px; border-radius: var(--radius-sm);
+  cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
+  transition: background 0.2s;
+}
+.btn:hover { background: var(--blue-dim); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: 6px 14px; font-size: 0.72rem; }
+
+/* LOADING */
+.spinner {
+  display: inline-block; width: 18px; height: 18px;
+  border: 2px solid var(--bg-4); border-top-color: var(--blue);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-overlay {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; padding: 40px; color: var(--text-3); font-size: 0.85rem;
+}
+
+/* ERROR */
+.error-msg {
+  background: var(--red-dim); border: 1px solid rgba(232,93,93,0.3);
+  border-radius: var(--radius-sm); padding: 12px 16px;
+  color: var(--red); font-size: 0.82rem; margin-bottom: 16px;
+}
+
+/* DATE RANGE */
+.date-bar {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+}
+.date-bar label {
+  font-size: 0.7rem; font-weight: 600; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.date-bar input[type="date"] {
+  background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text-1); font-family: inherit; font-size: 0.8rem;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+}
+.date-bar input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
+
+/* SVG chart styles */
+.chart-line { fill: none; stroke: var(--blue); stroke-width: 2; }
+.chart-area { fill: var(--blue-glow); }
+.chart-dot { fill: var(--blue); }
+.chart-grid { stroke: var(--bg-4); stroke-width: 1; }
+.chart-label { fill: var(--text-3); font-size: 11px; font-family: 'Inter', sans-serif; }
+.chart-val-label { fill: var(--text-1); font-size: 11px; font-family: 'Inter', sans-serif; font-weight: 600; }
+.chart-benchmark { stroke: var(--green); stroke-width: 1; stroke-dasharray: 6 4; }
+.chart-benchmark-label { fill: var(--green); font-size: 10px; font-family: 'Inter', sans-serif; }
+
+/* MULTI CHART GRID */
+.chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">
+    <h1>JOFA Porcinos</h1>
+    <span>Panel de Gestion Productiva</span>
+  </div>
+  <div class="header-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Verificando conexion...</span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabNav">
+  <button class="tab-btn active" data-tab="resumen">Resumen</button>
+  <button class="tab-btn" data-tab="servicio">Servicio</button>
+  <button class="tab-btn" data-tab="maternidad">Maternidad</button>
+  <button class="tab-btn" data-tab="destete">Destete</button>
+  <button class="tab-btn" data-tab="mortalidad">Mortalidad</button>
+  <button class="tab-btn" data-tab="engorde">Engorde</button>
+  <button class="tab-btn" data-tab="indicadores">Indicadores</button>
+  <button class="tab-btn" data-tab="config">Config</button>
+</nav>
+
+<main class="main">
+
+  <!-- RESUMEN -->
+  <div class="page active" id="page-resumen">
+    <div class="section">
+      <div class="section-title">Indicadores Productivos - Sitio 1</div>
+      <div class="kpi-grid" id="kpi-resumen-prod">
+        <div class="kpi-card" id="kpi-stock"><div class="kpi-label">Stock Madres</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-psy"><div class="kpi-label">PSY</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-tp"><div class="kpi-label">Tasa Paricion</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-nv"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mpd"><div class="kpi-label">Mort. Pre-Destete</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-dnp"><div class="kpi-label">Dias No Productivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Indicadores Engorde</div>
+      <div class="kpi-grid" id="kpi-resumen-eng">
+        <div class="kpi-card" id="kpi-gdp-r"><div class="kpi-label">GDP</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-conv-r"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mort-eng-r"><div class="kpi-label">Mortalidad Engorde</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-peso-sal-r"><div class="kpi-label">Peso Medio Salida</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Evolucion PSY - Ultimos 6 Meses</div>
+      <div class="chart-box" id="chart-psy-trend">
+        <div class="loading-overlay"><div class="spinner"></div> Cargando datos...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERVICIO -->
+  <div class="page" id="page-servicio">
+    <div class="section">
+      <div class="section-title">Indicadores de Servicio</div>
+      <div class="kpi-grid" id="kpi-servicio">
+        <div class="kpi-card" id="kpi-tot-serv"><div class="kpi-label">Total Servicios</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-idc"><div class="kpi-label">IDC (Dest-Cubricion)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-s7d"><div class="kpi-label">% Serv. menos 7 dias</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-rep"><div class="kpi-label">Repeticion Celo</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Servicios Recientes</div>
+      <div class="table-wrap" id="table-servicios">
+        <div class="loading-overlay"><div class="spinner"></div> Cargando servicios...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MATERNIDAD -->
+  <div class="page" id="page-maternidad">
+    <div class="section">
+      <div class="section-title">Indicadores de Maternidad</div>
+      <div class="kpi-grid" id="kpi-maternidad">
+        <div class="kpi-card" id="kpi-tot-par"><div class="kpi-label">Total Partos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-nv-prom"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-nt"><div class="kpi-label">Total Nacidos Vivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mom"><div class="kpi-label">Momificados</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mn"><div class="kpi-label">Nacidos Muertos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Partos Recientes</div>
+      <div class="table-wrap" id="table-partos">
+        <div class="loading-overlay"><div class="spinner"></div> Cargando partos...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESTETE -->
+  <div class="page" id="page-destete">
+    <div class="section">
+      <div class="section-title">Indicadores de Destete</div>
+      <div class="kpi-grid" id="kpi-destete">
+        <div class="kpi-card" id="kpi-tot-dest"><div class="kpi-label">Total Destetes</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-prom-dest"><div class="kpi-label">Prom. Destetados</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-peso-dest"><div class="kpi-label">Peso Destete (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-dias-lact"><div class="kpi-label">Dias Lactancia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-gpd-lech"><div class="kpi-label">GPD Lechones</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Destetes Recientes</div>
+      <div class="table-wrap" id="table-destetes">
+        <div class="loading-overlay"><div class="spinner"></div> Cargando destetes...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MORTALIDAD -->
+  <div class="page" id="page-mortalidad">
+    <div class="section">
+      <div class="section-title">Indicadores de Mortalidad</div>
+      <div class="kpi-grid" id="kpi-mortalidad">
+        <div class="kpi-card" id="kpi-mort-pd"><div class="kpi-label">Mort. Pre-Destete (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mort-eng"><div class="kpi-label">Mort. Engorde (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mort-hem"><div class="kpi-label">Mort. Hembras (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Resumen de Mortalidad</div>
+      <div class="config-card">
+        <p>Los datos de mortalidad se calculan a partir de los KPIs de cada sitio productivo. La mortalidad pre-destete proviene de Sitio 1 (maternidad), la mortalidad de engorde de Sitio 3 (terminacion), y la mortalidad de hembras del inventario reproductivo.</p>
+        <p>Benchmark Argentina: Pre-destete menor a 10% | Engorde menor a 3% | Hembras menor a 8% anual</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENGORDE -->
+  <div class="page" id="page-engorde">
+    <div class="section">
+      <div class="section-title">Indicadores de Engorde</div>
+      <div class="kpi-grid" id="kpi-engorde">
+        <div class="kpi-card" id="kpi-gdp-e"><div class="kpi-label">GDP (kg/dia)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-conv-e"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-peso-ent"><div class="kpi-label">Peso Entrada (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-peso-sal-e"><div class="kpi-label">Peso Salida (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mort-e"><div class="kpi-label">Mortalidad (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-tot-sal"><div class="kpi-label">Total Salidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Salidas de Lotes Recientes</div>
+      <div class="table-wrap" id="table-salidas">
+        <div class="loading-overlay"><div class="spinner"></div> Cargando salidas...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INDICADORES -->
+  <div class="page" id="page-indicadores">
+    <div class="section">
+      <div class="section-title">Tendencias - Ultimos 6 Meses</div>
+      <div class="chart-grid-2">
+        <div class="chart-box" id="chart-ind-psy"><div class="chart-title">PSY (Destetados/Hembra/Anio)</div><div class="loading-overlay"><div class="spinner"></div></div></div>
+        <div class="chart-box" id="chart-ind-tp"><div class="chart-title">Tasa de Paricion (%)</div><div class="loading-overlay"><div class="spinner"></div></div></div>
+        <div class="chart-box" id="chart-ind-nv"><div class="chart-title">Nacidos Vivos Promedio</div><div class="loading-overlay"><div class="spinner"></div></div></div>
+        <div class="chart-box" id="chart-ind-mpd"><div class="chart-title">Mortalidad Pre-Destete (%)</div><div class="loading-overlay"><div class="spinner"></div></div></div>
+        <div class="chart-box" id="chart-ind-gdp"><div class="chart-title">GDP Engorde (kg/dia)</div><div class="loading-overlay"><div class="spinner"></div></div></div>
+        <div class="chart-box" id="chart-ind-conv"><div class="chart-title">Conversion Alimenticia</div><div class="loading-overlay"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="page" id="page-config">
+    <div class="section">
+      <div class="section-title">Configuracion de Conexion</div>
+      <div class="config-card">
+        <h3>Estado de la API</h3>
+        <div class="config-row">
+          <span class="config-label">Estado</span>
+          <span class="config-val" id="cfg-status">Verificando...</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Granja</span>
+          <span class="config-val" id="cfg-farm-name">--</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">UUID</span>
+          <span class="config-val" id="cfg-farm-uuid">--</span>
+        </div>
+        <div class="config-row">
+          <span class="config-label">Proxy</span>
+          <span class="config-val">/api/agriness</span>
+        </div>
+        <div style="margin-top: 16px;">
+          <button class="btn" id="btnTestConn">Probar Conexion</button>
+        </div>
+      </div>
+      <div class="config-card">
+        <h3>Datos y Consolidacion</h3>
+        <p>Los datos de Agriness S4 se consolidan diariamente entre las 01:00 y 07:00 (GMT-3). Los KPIs reflejan la informacion disponible hasta la ultima consolidacion completada.</p>
+        <p>Para datos en tiempo real de eventos individuales (servicios, partos, destetes), se consultan los endpoints de listado que reflejan los registros ingresados al sistema.</p>
+      </div>
+      <div class="config-card">
+        <h3>Variables de Entorno (Netlify)</h3>
+        <p>El proxy de Netlify Functions requiere las siguientes variables de entorno configuradas en el panel de Netlify:</p>
+        <div class="config-row"><span class="config-label">WSO2_API_KEY</span><span class="config-val">API Key del gateway WSO2 (Dev Portal > Applications > Production)</span></div>
+        <div class="config-row"><span class="config-label">S4_USERNAME</span><span class="config-val">Email del usuario con acceso a la granja JOFA</span></div>
+        <div class="config-row"><span class="config-label">S4_PASSWORD</span><span class="config-val">Contraseña del usuario S4</span></div>
+        <p style="margin-top:8px;">WSO2_API_KEY se obtiene del Dev Portal (am.agriness.com:9443/devportal). Las credenciales S4 son las mismas que se usan para ingresar a S4 Farm.</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  // ---- STATE ----
+  const state = {
+    connected: false,
+    farmId: null,
+    farmName: null,
+    kpiCache: {},
+    currentTab: 'resumen'
+  };
+
+  const BENCHMARKS = {
+    PSY: 28.5,
+    FARROWING_RATE: 88,
+    BORN_ALIVE: 13.5,
+    PRE_WEAN_MORT: 10,
+    NPD: 35,
+    WMI: 6,
+    GDP: 0.85,
+    FEED_CONV: 2.5,
+    SLAUGHTER_WT: 115
+  };
+
+  // ---- UTILS ----
+  function fmtNum(v, dec) {
+    if (v == null || isNaN(v)) return '--';
+    dec = dec !== undefined ? dec : 1;
+    return Number(v).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function fmtInt(v) {
+    if (v == null || isNaN(v)) return '--';
+    return Math.round(Number(v)).toLocaleString('es-AR');
+  }
+  function fmtPct(v) {
+    if (v == null || isNaN(v)) return '--';
+    return fmtNum(v, 1) + '%';
+  }
+  function fmtDate(d) {
+    if (!d) return '--';
+    const p = d.split('-');
+    if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
+    return d;
+  }
+
+  function dateStr(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function monthStart(offset) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + (offset || 0));
+    d.setDate(1);
+    return dateStr(d);
+  }
+  function monthEnd(offset) {
+    const d = new Date();
+    if (offset) d.setMonth(d.getMonth() + offset);
+    // last day
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return dateStr(last);
+  }
+  function today() { return dateStr(new Date()); }
+
+  function last6Months() {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      months.push({ start: monthStart(-i), end: i === 0 ? today() : monthEnd(-i) });
+    }
+    return months;
+  }
+
+  function monthLabel(dateStr) {
+    const m = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const p = dateStr.split('-');
+    return m[parseInt(p[1],10)-1] + ' ' + p[0].slice(2);
+  }
+
+  // ---- API ----
+  async function apiCall(action, params) {
+    try {
+      const resp = await fetch('/api/agriness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, params: params || {} })
+      });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error('HTTP ' + resp.status + ': ' + txt);
+      }
+      return await resp.json();
+    } catch (e) {
+      console.error('API error [' + action + ']:', e);
+      throw e;
+    }
+  }
+
+  async function fetchKpis(site, kpis, startDate, endDate, groupBy) {
+    if (!state.farmId) throw new Error('No farm connected');
+    return apiCall('kpis_' + site, {
+      farms: [state.farmId],
+      start_date: startDate,
+      end_date: endDate,
+      group_by: groupBy || 'farm_id',
+      date_format: 'year_month',
+      sort: 'asc',
+      kpis: kpis,
+      offset: 0,
+      limit: 100
+    });
+  }
+
+  async function fetchEvents(action, startDate, endDate) {
+    if (!state.farmId) throw new Error('No farm connected');
+    return apiCall(action, {
+      farms: [state.farmId],
+      start_date: startDate,
+      end_date: endDate,
+      start_end_date_behavior: 'event_date',
+      offset: 0,
+      limit: 1000
+    });
+  }
+
+  // ---- KPI CARD HELPER ----
+  function setKpi(id, value, benchVal, benchLabel, higherIsGood, unit) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    const valEl = card.querySelector('.kpi-value');
+    const benchEl = card.querySelector('.kpi-bench');
+    valEl.classList.remove('loading');
+    valEl.textContent = value;
+
+    if (benchVal != null && !isNaN(parseFloat(String(value).replace(/\./g,'').replace(',','.')))) {
+      const numVal = parseFloat(String(value).replace(/\./g,'').replace(',','.'));
+      let diff = numVal - benchVal;
+      let pct = benchVal !== 0 ? ((diff / benchVal) * 100) : 0;
+      let isGood = higherIsGood ? diff >= 0 : diff <= 0;
+      let cls = isGood ? 'good' : 'bad';
+      let arrow = diff >= 0 ? String.fromCharCode(9650) : String.fromCharCode(9660);
+      benchEl.innerHTML = '<span class="pill ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span> <span>vs bench ' + fmtNum(benchVal, 1) + (unit || '') + '</span>';
+    } else {
+      benchEl.innerHTML = '';
+    }
+  }
+
+  function setKpiError(id, msg) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    const valEl = card.querySelector('.kpi-value');
+    valEl.classList.remove('loading');
+    valEl.textContent = '--';
+    valEl.title = msg || 'Error al cargar';
+  }
+
+  function extractKpiValue(data, kpiCode) {
+    // data can be array of results or object with results array
+    let results = Array.isArray(data) ? data : (data && data.results ? data.results : []);
+    if (!Array.isArray(results)) results = [results];
+    for (const r of results) {
+      if (r.kpis) {
+        for (const k of r.kpis) {
+          if (k.code === kpiCode || k.kpi === kpiCode) return k.value;
+        }
+      }
+      if (r.code === kpiCode || r.kpi === kpiCode) return r.value;
+    }
+    // try flat search
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      for (const key of Object.keys(data)) {
+        if (key === kpiCode) return data[key];
+      }
+    }
+    return null;
+  }
+
+  function extractKpiMonthly(data, kpiCode) {
+    // returns array of {month, value}
+    let results = Array.isArray(data) ? data : (data && data.results ? data.results : []);
+    if (!Array.isArray(results)) results = [results];
+    const out = [];
+    for (const r of results) {
+      let period = r.date || r.period || r.year_month || '';
+      if (r.kpis) {
+        for (const k of r.kpis) {
+          if (k.code === kpiCode || k.kpi === kpiCode) {
+            out.push({ month: period, value: k.value });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  // ---- SVG CHART ----
+  function renderLineChart(containerId, dataPoints, benchmarkVal, yLabel, color) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    color = color || 'var(--blue)';
+
+    // Filter valid
+    const pts = dataPoints.filter(p => p.value != null && !isNaN(p.value));
+    if (pts.length === 0) {
+      container.innerHTML = '<div class="table-empty">Sin datos para graficar</div>';
+      return;
+    }
+
+    const W = 600, H = 220, PL = 55, PR = 20, PT = 20, PB = 40;
+    const cw = W - PL - PR, ch = H - PT - PB;
+
+    const vals = pts.map(p => p.value);
+    if (benchmarkVal != null) vals.push(benchmarkVal);
+    let minV = Math.min(...vals), maxV = Math.max(...vals);
+    const range = maxV - minV || 1;
+    minV -= range * 0.1;
+    maxV += range * 0.1;
+
+    function x(i) { return PL + (pts.length > 1 ? i / (pts.length - 1) * cw : cw / 2); }
+    function y(v) { return PT + ch - ((v - minV) / (maxV - minV)) * ch; }
+
+    let path = '';
+    let areaPath = 'M ' + x(0) + ' ' + y(pts[0].value);
+    pts.forEach((p, i) => {
+      const px = x(i), py = y(p.value);
+      path += (i === 0 ? 'M ' : ' L ') + px + ' ' + py;
+      areaPath += ' L ' + px + ' ' + py;
+    });
+    areaPath += ' L ' + x(pts.length - 1) + ' ' + (PT + ch) + ' L ' + x(0) + ' ' + (PT + ch) + ' Z';
+
+    let dots = '';
+    pts.forEach((p, i) => {
+      const px = x(i), py = y(p.value);
+      dots += '<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color + '" />';
+      dots += '<text x="' + px + '" y="' + (py - 10) + '" text-anchor="middle" class="chart-val-label">' + fmtNum(p.value, 1) + '</text>';
+    });
+
+    let labels = '';
+    pts.forEach((p, i) => {
+      labels += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" class="chart-label">' + (p.label || p.month || '') + '</text>';
+    });
+
+    // grid lines
+    let grid = '';
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const gy = PT + (ch / steps) * i;
+      const gv = maxV - ((maxV - minV) / steps) * i;
+      grid += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" class="chart-grid" />';
+      grid += '<text x="' + (PL - 8) + '" y="' + (gy + 4) + '" text-anchor="end" class="chart-label">' + fmtNum(gv, 1) + '</text>';
+    }
+
+    let bench = '';
+    if (benchmarkVal != null) {
+      const by = y(benchmarkVal);
+      bench = '<line x1="' + PL + '" y1="' + by + '" x2="' + (W - PR) + '" y2="' + by + '" class="chart-benchmark" />';
+      bench += '<text x="' + (W - PR + 2) + '" y="' + (by - 4) + '" class="chart-benchmark-label">Bench</text>';
+    }
+
+    const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">'
+      + grid + bench
+      + '<path d="' + areaPath + '" fill="' + color + '" opacity="0.1" />'
+      + '<path d="' + path + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round" />'
+      + dots + labels
+      + '</svg>';
+
+    // Keep title if exists
+    const titleEl = container.querySelector('.chart-title');
+    container.innerHTML = (titleEl ? '<div class="chart-title">' + titleEl.textContent + '</div>' : '') + svg;
+  }
+
+  // ---- TABLE HELPERS ----
+  function renderTable(containerId, headers, rows) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!rows || rows.length === 0) {
+      container.innerHTML = '<div class="table-empty">Sin datos disponibles para el periodo seleccionado</div>';
+      return;
+    }
+    let html = '<table><thead><tr>';
+    headers.forEach(h => { html += '<th>' + h + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(row => {
+      html += '<tr>';
+      row.forEach(cell => { html += '<td>' + (cell != null ? cell : '--') + '</td>'; });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+
+  // ---- TAB NAVIGATION ----
+  document.getElementById('tabNav').addEventListener('click', function(e) {
+    if (!e.target.classList.contains('tab-btn')) return;
+    const tab = e.target.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + tab).classList.add('active');
+    state.currentTab = tab;
+    loadTabData(tab);
+  });
+
+  // ---- CONNECTION ----
+  async function checkConnection() {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    try {
+      const data = await apiCall('health');
+      // try to extract farm info
+      let farms = [];
+      if (Array.isArray(data)) farms = data;
+      else if (data && data.farms) farms = data.farms;
+      else if (data && data.results) farms = data.results;
+      else if (data && data.id) farms = [data];
+
+      if (farms.length > 0) {
+        const farm = farms[0];
+        state.farmId = farm.id || farm.uuid || farm.farm_id;
+        state.farmName = farm.name || farm.farm_name || 'JOFA S.A.';
+        state.connected = true;
+        dot.className = 'status-dot ok';
+        txt.textContent = 'Conectado - ' + state.farmName;
+        document.getElementById('cfg-status').textContent = 'Conectado';
+        document.getElementById('cfg-status').style.color = 'var(--green)';
+        document.getElementById('cfg-farm-name').textContent = state.farmName;
+        document.getElementById('cfg-farm-uuid').textContent = state.farmId;
+        return true;
+      } else {
+        // Try farms endpoint
+        return await loadFarms();
+      }
+    } catch (e) {
+      // try farms endpoint as fallback
+      try {
+        return await loadFarms();
+      } catch (e2) {
+        dot.className = 'status-dot err';
+        txt.textContent = 'Sin conexion';
+        document.getElementById('cfg-status').textContent = 'Error: ' + e2.message;
+        document.getElementById('cfg-status').style.color = 'var(--red)';
+        state.connected = false;
+        return false;
+      }
+    }
+  }
+
+  async function loadFarms() {
+    const data = await apiCall('farms');
+    let farms = Array.isArray(data) ? data : (data && data.results ? data.results : []);
+    if (farms.length > 0) {
+      const farm = farms[0];
+      state.farmId = farm.id || farm.uuid || farm.farm_id;
+      state.farmName = farm.name || farm.farm_name || 'JOFA S.A.';
+      state.connected = true;
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      dot.className = 'status-dot ok';
+      txt.textContent = 'Conectado - ' + state.farmName;
+      document.getElementById('cfg-status').textContent = 'Conectado';
+      document.getElementById('cfg-status').style.color = 'var(--green)';
+      document.getElementById('cfg-farm-name').textContent = state.farmName;
+      document.getElementById('cfg-farm-uuid').textContent = state.farmId;
+      return true;
+    }
+    throw new Error('No farms found');
+  }
+
+  // ---- DATA LOADERS ----
+  const tabLoaded = {};
+
+  async function loadTabData(tab) {
+    if (!state.connected) return;
+    if (tabLoaded[tab]) return;
+    tabLoaded[tab] = true;
+
+    switch (tab) {
+      case 'resumen': await loadResumen(); break;
+      case 'servicio': await loadServicio(); break;
+      case 'maternidad': await loadMaternidad(); break;
+      case 'destete': await loadDestete(); break;
+      case 'mortalidad': await loadMortalidad(); break;
+      case 'engorde': await loadEngorde(); break;
+      case 'indicadores': await loadIndicadores(); break;
+    }
+  }
+
+  // ---- RESUMEN ----
+  async function loadResumen() {
+    const start = monthStart(-5);
+    const end = today();
+    const kpiCodes1 = [
+      'ACTIVE_SOWS_INVENTORY','PIGS_WEANED_MATED_FEMALE_YEAR','FARROWING_RATE',
+      'AVERAGE_BORN_ALIVE','RATE_WEANING_PIG_DEATHS','AVERAGE_NON_PRODUCTIVE_DAYS'
+    ];
+
+    // Sitio 1 KPIs
+    try {
+      const data = await fetchKpis('sitio1', kpiCodes1, start, end, 'farm_id');
+      const v = (code) => extractKpiValue(data, code);
+      setKpi('kpi-stock', fmtInt(v('ACTIVE_SOWS_INVENTORY')), null, null, true);
+      setKpi('kpi-psy', fmtNum(v('PIGS_WEANED_MATED_FEMALE_YEAR'), 2), BENCHMARKS.PSY, 'Bench', true);
+      setKpi('kpi-tp', fmtPct(v('FARROWING_RATE')), BENCHMARKS.FARROWING_RATE, 'Bench', true, '%');
+      setKpi('kpi-nv', fmtNum(v('AVERAGE_BORN_ALIVE'), 1), BENCHMARKS.BORN_ALIVE, 'Bench', true);
+      setKpi('kpi-mpd', fmtPct(v('RATE_WEANING_PIG_DEATHS')), BENCHMARKS.PRE_WEAN_MORT, 'Bench', false, '%');
+      setKpi('kpi-dnp', fmtNum(v('AVERAGE_NON_PRODUCTIVE_DAYS'), 0), BENCHMARKS.NPD, 'Bench', false);
+    } catch (e) {
+      ['kpi-stock','kpi-psy','kpi-tp','kpi-nv','kpi-mpd','kpi-dnp'].forEach(id => setKpiError(id, e.message));
+    }
+
+    // Engorde KPIs
+    try {
+      const kpiCodes3 = ['DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE'];
+      const data3 = await fetchKpis('sitio3', kpiCodes3, start, end, 'farm_id');
+      const v3 = (code) => extractKpiValue(data3, code);
+      setKpi('kpi-gdp-r', fmtNum(v3('DAILY_WEIGHT_GAIN_STAGE'), 3), BENCHMARKS.GDP, 'Bench', true, ' kg');
+      setKpi('kpi-conv-r', fmtNum(v3('FEED_CONVERSION_RATIO_STAGE'), 2), BENCHMARKS.FEED_CONV, 'Bench', false);
+      setKpi('kpi-mort-eng-r', fmtPct(v3('RATE_MORTALITY_INPLACE_STAGE')), 3, 'Bench', false, '%');
+      setKpi('kpi-peso-sal-r', fmtNum(v3('WAVERAGE_WEIGHT_OUTPUT_STAGE'), 1) + ' kg', BENCHMARKS.SLAUGHTER_WT, 'Bench', true, ' kg');
+    } catch (e) {
+      ['kpi-gdp-r','kpi-conv-r','kpi-mort-eng-r','kpi-peso-sal-r'].forEach(id => setKpiError(id, e.message));
+    }
+
+    // PSY trend chart
+    try {
+      const months = last6Months();
+      const psyData = await fetchKpis('sitio1', ['PIGS_WEANED_MATED_FEMALE_YEAR'], months[0].start, months[months.length-1].end, 'year_month');
+      let psyPts = extractKpiMonthly(psyData, 'PIGS_WEANED_MATED_FEMALE_YEAR');
+      if (psyPts.length === 0) {
+        // try fetching per month
+        const pts = [];
+        for (const m of months) {
+          try {
+            const md = await fetchKpis('sitio1', ['PIGS_WEANED_MATED_FEMALE_YEAR'], m.start, m.end, 'farm_id');
+            const val = extractKpiValue(md, 'PIGS_WEANED_MATED_FEMALE_YEAR');
+            pts.push({ month: m.start, label: monthLabel(m.start), value: val });
+          } catch (_) {
+            pts.push({ month: m.start, label: monthLabel(m.start), value: null });
+          }
+        }
+        psyPts = pts;
+      } else {
+        psyPts = psyPts.map(p => ({ ...p, label: monthLabel(p.month) }));
+      }
+      renderLineChart('chart-psy-trend', psyPts, BENCHMARKS.PSY, 'PSY');
+    } catch (e) {
+      document.getElementById('chart-psy-trend').innerHTML = '<div class="table-empty">Error al cargar tendencia PSY: ' + e.message + '</div>';
+    }
+  }
+
+  // ---- SERVICIO ----
+  async function loadServicio() {
+    const start = monthStart(0);
+    const end = today();
+
+    try {
+      const kpis = ['TOTAL_SERVICES','AVERAGE_WMI_DAYS','RATE_SERVICES_7DAYS'];
+      const data = await fetchKpis('sitio1', kpis, start, end, 'farm_id');
+      const v = (code) => extractKpiValue(data, code);
+      setKpi('kpi-tot-serv', fmtInt(v('TOTAL_SERVICES')), null, null, true);
+      setKpi('kpi-idc', fmtNum(v('AVERAGE_WMI_DAYS'), 1) + ' dias', BENCHMARKS.WMI, 'Bench', false, ' d');
+      setKpi('kpi-s7d', fmtPct(v('RATE_SERVICES_7DAYS')), null, null, true);
+      setKpi('kpi-rep', '--', null, null, false);
+    } catch (e) {
+      ['kpi-tot-serv','kpi-idc','kpi-s7d','kpi-rep'].forEach(id => setKpiError(id, e.message));
+    }
+
+    // Servicios table
+    try {
+      const events = await fetchEvents('servicios', monthStart(-1), end);
+      let rows = Array.isArray(events) ? events : (events && events.results ? events.results : []);
+      const tableRows = rows.slice(0, 50).map(r => [
+        fmtDate(r.event_date || r.date || r.service_date),
+        r.sow_code || r.animal_code || r.sow || '--',
+        r.boar_code || r.boar || '--',
+        r.service_type || r.type || '--',
+        r.parity || r.order || '--',
+        r.technician || '--'
+      ]);
+      renderTable('table-servicios', ['Fecha','Hembra','Macho','Tipo','Parto Nro','Tecnico'], tableRows);
+    } catch (e) {
+      document.getElementById('table-servicios').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+    }
+  }
+
+  // ---- MATERNIDAD ----
+  async function loadMaternidad() {
+    const start = monthStart(0);
+    const end = today();
+
+    try {
+      const kpis = ['TOTAL_FARROWINGS','AVERAGE_BORN_ALIVE','TOTAL_BORN_ALIVE','TOTAL_BORN_MUMMIFIED','TOTAL_BORN_STILLBORN'];
+      const data = await fetchKpis('sitio1', kpis, start, end, 'farm_id');
+      const v = (code) => extractKpiValue(data, code);
+      setKpi('kpi-tot-par', fmtInt(v('TOTAL_FARROWINGS')), null, null, true);
+      setKpi('kpi-nv-prom', fmtNum(v('AVERAGE_BORN_ALIVE'), 1), BENCHMARKS.BORN_ALIVE, 'Bench', true);
+      setKpi('kpi-nt', fmtInt(v('TOTAL_BORN_ALIVE')), null, null, true);
+      setKpi('kpi-mom', fmtInt(v('TOTAL_BORN_MUMMIFIED')), null, null, false);
+      setKpi('kpi-mn', fmtInt(v('TOTAL_BORN_STILLBORN')), null, null, false);
+    } catch (e) {
+      ['kpi-tot-par','kpi-nv-prom','kpi-nt','kpi-mom','kpi-mn'].forEach(id => setKpiError(id, e.message));
+    }
+
+    // Partos table
+    try {
+      const events = await fetchEvents('partos', monthStart(-1), end);
+      let rows = Array.isArray(events) ? events : (events && events.results ? events.results : []);
+      const tableRows = rows.slice(0, 50).map(r => [
+        fmtDate(r.event_date || r.date || r.farrowing_date),
+        r.sow_code || r.animal_code || r.sow || '--',
+        r.parity || r.order || '--',
+        r.born_alive || r.total_born_alive || '--',
+        r.stillborn || r.total_stillborn || '--',
+        r.mummified || r.total_mummified || '--',
+        r.total_born || '--'
+      ]);
+      renderTable('table-partos', ['Fecha','Hembra','Parto Nro','Nac. Vivos','Muertos','Momif.','Total Nac.'], tableRows);
+    } catch (e) {
+      document.getElementById('table-partos').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+    }
+  }
+
+  // ---- DESTETE ----
+  async function loadDestete() {
+    const start = monthStart(0);
+    const end = today();
+
+    try {
+      const kpis = ['TOTAL_WEANED_PIGS_RELATED','AVERAGE_WEANED_PIGS','PIGLET_WEIGHT_WEAN','AVERAGE_LACTATING_DAYS','WAVERAGE_WEANED_PIGS_DAILY_WEIGHT_GAIN'];
+      const data = await fetchKpis('sitio1', kpis, start, end, 'farm_id');
+      const v = (code) => extractKpiValue(data, code);
+      setKpi('kpi-tot-dest', fmtInt(v('TOTAL_WEANED_PIGS_RELATED')), null, null, true);
+      setKpi('kpi-prom-dest', fmtNum(v('AVERAGE_WEANED_PIGS'), 1), null, null, true);
+      setKpi('kpi-peso-dest', fmtNum(v('PIGLET_WEIGHT_WEAN'), 2), null, null, true);
+      setKpi('kpi-dias-lact', fmtNum(v('AVERAGE_LACTATING_DAYS'), 1), null, null, false);
+      setKpi('kpi-gpd-lech', fmtNum(v('WAVERAGE_WEANED_PIGS_DAILY_WEIGHT_GAIN'), 3), null, null, true);
+    } catch (e) {
+      ['kpi-tot-dest','kpi-prom-dest','kpi-peso-dest','kpi-dias-lact','kpi-gpd-lech'].forEach(id => setKpiError(id, e.message));
+    }
+
+    // Destetes table
+    try {
+      const events = await fetchEvents('destetes', monthStart(-1), end);
+      let rows = Array.isArray(events) ? events : (events && events.results ? events.results : []);
+      const tableRows = rows.slice(0, 50).map(r => [
+        fmtDate(r.event_date || r.date || r.weaning_date),
+        r.sow_code || r.animal_code || r.sow || '--',
+        r.parity || r.order || '--',
+        r.weaned_pigs || r.total_weaned || '--',
+        r.avg_weight ? fmtNum(r.avg_weight, 2) : (r.piglet_weight ? fmtNum(r.piglet_weight, 2) : '--'),
+        r.lactation_days || r.days || '--'
+      ]);
+      renderTable('table-destetes', ['Fecha','Hembra','Parto Nro','Destetados','Peso Prom (kg)','Dias Lact.'], tableRows);
+    } catch (e) {
+      document.getElementById('table-destetes').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+    }
+  }
+
+  // ---- MORTALIDAD ----
+  async function loadMortalidad() {
+    const start = monthStart(-2);
+    const end = today();
+
+    try {
+      const data1 = await fetchKpis('sitio1', ['RATE_WEANING_PIG_DEATHS'], start, end, 'farm_id');
+      setKpi('kpi-mort-pd', fmtPct(extractKpiValue(data1, 'RATE_WEANING_PIG_DEATHS')), BENCHMARKS.PRE_WEAN_MORT, 'Bench', false, '%');
+    } catch (e) { setKpiError('kpi-mort-pd', e.message); }
+
+    try {
+      const data3 = await fetchKpis('sitio3', ['RATE_MORTALITY_INPLACE_STAGE'], start, end, 'farm_id');
+      setKpi('kpi-mort-eng', fmtPct(extractKpiValue(data3, 'RATE_MORTALITY_INPLACE_STAGE')), 3, 'Bench', false, '%');
+    } catch (e) { setKpiError('kpi-mort-eng', e.message); }
+
+    // Mortality hembras - not directly available, show placeholder
+    setKpi('kpi-mort-hem', '--', null, null, false);
+  }
+
+  // ---- ENGORDE ----
+  async function loadEngorde() {
+    const start = monthStart(-2);
+    const end = today();
+
+    try {
+      const kpis = ['DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_ANIMAL_INPUT_STAGE'];
+      const data = await fetchKpis('sitio3', kpis, start, end, 'farm_id');
+      const v = (code) => extractKpiValue(data, code);
+      setKpi('kpi-gdp-e', fmtNum(v('DAILY_WEIGHT_GAIN_STAGE'), 3), BENCHMARKS.GDP, 'Bench', true, ' kg');
+      setKpi('kpi-conv-e', fmtNum(v('FEED_CONVERSION_RATIO_STAGE'), 2), BENCHMARKS.FEED_CONV, 'Bench', false);
+      // Input weight: we just show input count as reference
+      setKpi('kpi-peso-ent', fmtInt(v('TOTAL_ANIMAL_INPUT_STAGE')) + ' cab', null, null, true);
+      setKpi('kpi-peso-sal-e', fmtNum(v('WAVERAGE_WEIGHT_OUTPUT_STAGE'), 1) + ' kg', BENCHMARKS.SLAUGHTER_WT, 'Bench', true, ' kg');
+      setKpi('kpi-mort-e', fmtPct(v('RATE_MORTALITY_INPLACE_STAGE')), 3, 'Bench', false, '%');
+      setKpi('kpi-tot-sal', fmtInt(v('TOTAL_ANIMAL_OUTPUT_STAGE')), null, null, true);
+    } catch (e) {
+      ['kpi-gdp-e','kpi-conv-e','kpi-peso-ent','kpi-peso-sal-e','kpi-mort-e','kpi-tot-sal'].forEach(id => setKpiError(id, e.message));
+    }
+
+    // Salidas table
+    try {
+      const events = await fetchEvents('salidas_lotes', monthStart(-2), end);
+      let rows = Array.isArray(events) ? events : (events && events.results ? events.results : []);
+      const tableRows = rows.slice(0, 50).map(r => [
+        fmtDate(r.event_date || r.date || r.output_date),
+        r.lot_code || r.lot || r.batch || '--',
+        r.event_type || r.type || r.output_type || '--',
+        r.quantity || r.total_animals || r.head_count || '--',
+        r.total_weight ? fmtNum(r.total_weight, 0) + ' kg' : '--',
+        r.avg_weight ? fmtNum(r.avg_weight, 1) + ' kg' : (r.average_weight ? fmtNum(r.average_weight, 1) + ' kg' : '--'),
+        r.supplier || r.destination || r.buyer || '--'
+      ]);
+      renderTable('table-salidas', ['Fecha','Lote','Tipo','Cantidad','Peso Total','Peso Prom','Destino'], tableRows);
+    } catch (e) {
+      document.getElementById('table-salidas').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+    }
+  }
+
+  // ---- INDICADORES (TRENDS) ----
+  async function loadIndicadores() {
+    const months = last6Months();
+    const startAll = months[0].start;
+    const endAll = months[months.length - 1].end;
+
+    async function loadTrendChart(containerId, site, kpiCode, benchmark, color) {
+      try {
+        // Try monthly grouped first
+        const data = await fetchKpis(site, [kpiCode], startAll, endAll, 'year_month');
+        let pts = extractKpiMonthly(data, kpiCode);
+        if (pts.length === 0) {
+          // fallback: per month
+          const fallback = [];
+          for (const m of months) {
+            try {
+              const md = await fetchKpis(site, [kpiCode], m.start, m.end, 'farm_id');
+              fallback.push({ month: m.start, label: monthLabel(m.start), value: extractKpiValue(md, kpiCode) });
+            } catch (_) {
+              fallback.push({ month: m.start, label: monthLabel(m.start), value: null });
+            }
+          }
+          pts = fallback;
+        } else {
+          pts = pts.map(p => ({ ...p, label: monthLabel(p.month) }));
+        }
+        renderLineChart(containerId, pts, benchmark, '', color);
+      } catch (e) {
+        const c = document.getElementById(containerId);
+        const title = c ? c.querySelector('.chart-title') : null;
+        if (c) c.innerHTML = (title ? '<div class="chart-title">' + title.textContent + '</div>' : '') + '<div class="table-empty">Error: ' + e.message + '</div>';
+      }
+    }
+
+    // Load all charts
+    await Promise.allSettled([
+      loadTrendChart('chart-ind-psy', 'sitio1', 'PIGS_WEANED_MATED_FEMALE_YEAR', BENCHMARKS.PSY, '#4f7df5'),
+      loadTrendChart('chart-ind-tp', 'sitio1', 'FARROWING_RATE', BENCHMARKS.FARROWING_RATE, '#4f7df5'),
+      loadTrendChart('chart-ind-nv', 'sitio1', 'AVERAGE_BORN_ALIVE', BENCHMARKS.BORN_ALIVE, '#2ecc8b'),
+      loadTrendChart('chart-ind-mpd', 'sitio1', 'RATE_WEANING_PIG_DEATHS', BENCHMARKS.PRE_WEAN_MORT, '#e85d5d'),
+      loadTrendChart('chart-ind-gdp', 'sitio3', 'DAILY_WEIGHT_GAIN_STAGE', BENCHMARKS.GDP, '#2ecc8b'),
+      loadTrendChart('chart-ind-conv', 'sitio3', 'FEED_CONVERSION_RATIO_STAGE', BENCHMARKS.FEED_CONV, '#f0c040')
+    ]);
+  }
+
+  // ---- CONFIG: TEST CONNECTION ----
+  document.getElementById('btnTestConn').addEventListener('click', async function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Probando...';
+    Object.keys(tabLoaded).forEach(k => delete tabLoaded[k]);
+    state.connected = false;
+    const ok = await checkConnection();
+    btn.disabled = false;
+    btn.textContent = 'Probar Conexion';
+    if (ok) {
+      tabLoaded['resumen'] = false;
+      loadTabData('resumen');
+    }
+  });
+
+  // ---- INIT ----
+  async function init() {
+    const ok = await checkConnection();
+    if (ok) {
+      loadTabData('resumen');
+    }
+  }
+
+  init();
+
+})();
+</script>
+</body>
+</html>
