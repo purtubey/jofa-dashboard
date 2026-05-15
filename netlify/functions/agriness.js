@@ -1,6 +1,6 @@
 // Netlify Serverless Function — Proxy para Agriness S4 API
 // Protege credenciales y evita CORS
-// Auth: OAuth2 Client Credentials → WSO2 Gateway (sin S4 login separado)
+// Auth: OAuth2 Client Credentials → WSO2 Gateway + S4 Login → header "token"
 
 const https = require('https');
 
@@ -14,9 +14,11 @@ const WSO2_CONSUMER_SECRET = process.env.WSO2_CONSUMER_SECRET || '';
 const S4_USERNAME = process.env.S4_USERNAME || '';
 const S4_PASSWORD = process.env.S4_PASSWORD || '';
 
-// Cache del token OAuth2
-let accessToken = null;
-let tokenExpiry = 0;
+// Cache de tokens
+let wso2Token = null;
+let wso2TokenExpiry = 0;
+let s4Token = null;
+let s4TokenExpiry = 0;
 
 function makeRequest(method, path, body, headers, port) {
   port = port || API_PORT;
@@ -26,13 +28,10 @@ function makeRequest(method, path, body, headers, port) {
       port: port,
       path: path,
       method: method,
-      headers: {
-        ...headers,
-      },
-      rejectUnauthorized: false, // Agriness usa cert auto-firmado
+      headers: { ...headers },
+      rejectUnauthorized: false,
     };
 
-    // Set Content-Type if not already set
     if (!options.headers['Content-Type']) {
       options.headers['Content-Type'] = 'application/json';
     }
@@ -57,59 +56,75 @@ function makeRequest(method, path, body, headers, port) {
   });
 }
 
-// Obtener token OAuth2 del gateway WSO2
-// Intenta password grant primero (incluye contexto de usuario S4),
-// si falla usa client_credentials grant
-async function getAccessToken() {
-  if (accessToken && Date.now() < tokenExpiry) return accessToken;
+async function getWso2Token() {
+  if (wso2Token && Date.now() < wso2TokenExpiry) return wso2Token;
 
-  const credentials = Buffer.from(`${WSO2_CONSUMER_KEY}:${WSO2_CONSUMER_SECRET}`).toString('base64');
+  const credentials = Buffer.from(WSO2_CONSUMER_KEY + ':' + WSO2_CONSUMER_SECRET).toString('base64');
 
-  // Intentar password grant (combina gateway auth + user context)
-  try {
-    const pwBody = `grant_type=password&username=${encodeURIComponent(S4_USERNAME)}&password=${encodeURIComponent(S4_PASSWORD)}`;
-    const res = await makeRequest(
-      'POST',
-      '/oauth2/token',
-      pwBody,
-      {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      TOKEN_PORT
-    );
-
-    if (res.status === 200 && res.data.access_token) {
-      accessToken = res.data.access_token;
-      tokenExpiry = Date.now() + ((res.data.expires_in || 3600) - 300) * 1000;
-      console.log('OAuth2 password grant token obtained, expires in', res.data.expires_in, 's');
-      return accessToken;
-    }
-    console.log('Password grant failed:', res.status, JSON.stringify(res.data));
-  } catch (e) {
-    console.log('Password grant error:', e.message);
-  }
-
-  // Fallback: client_credentials grant
   const res = await makeRequest(
-    'POST',
-    '/oauth2/token',
-    'grant_type=client_credentials',
-    {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    'POST', '/oauth2/token', 'grant_type=client_credentials',
+    { 'Authorization': 'Basic ' + credentials, 'Content-Type': 'application/x-www-form-urlencoded' },
     TOKEN_PORT
   );
 
   if (res.status === 200 && res.data.access_token) {
-    accessToken = res.data.access_token;
-    tokenExpiry = Date.now() + ((res.data.expires_in || 3600) - 300) * 1000;
-    console.log('OAuth2 client_credentials token obtained, expires in', res.data.expires_in, 's');
-    return accessToken;
+    wso2Token = res.data.access_token;
+    wso2TokenExpiry = Date.now() + ((res.data.expires_in || 3600) - 300) * 1000;
+    console.log('WSO2 OAuth2 token obtained, expires in', res.data.expires_in, 's');
+    return wso2Token;
   }
 
-  throw new Error(`OAuth2 failed: ${res.status} - ${JSON.stringify(res.data)}`);
+  throw new Error('WSO2 OAuth2 failed: ' + res.status + ' - ' + JSON.stringify(res.data));
+}
+
+// Login S4: devuelve { data: { token: "..." } }
+// Ese token se pasa como header "token" en llamadas API
+async function getS4Token() {
+  if (s4Token && Date.now() < s4TokenExpiry) return s4Token;
+
+  const gatewayToken = await getWso2Token();
+  console.log('Attempting S4 login with username:', S4_USERNAME);
+
+  const res = await makeRequest('POST', '/sitio1-swine-default/api/v1/login', {
+    username: S4_USERNAME,
+    password: S4_PASSWORD,
+  }, {
+    'Authorization': 'Bearer ' + gatewayToken,
+  });
+
+  console.log('S4 login response:', res.status, JSON.stringify(res.data).substring(0, 500));
+
+  if (res.status === 200) {
+    const token = (res.data && res.data.data && res.data.data.token) || (res.data && res.data.token) || (res.data && res.data.access_token);
+    if (token) {
+      s4Token = token;
+      s4TokenExpiry = Date.now() + 23 * 60 * 60 * 1000;
+      console.log('S4 token obtained, length:', token.length);
+      return s4Token;
+    }
+    console.error('S4 login 200 but no token:', JSON.stringify(res.data));
+  }
+
+  // Fallback: WSO2 password grant
+  console.log('S4 login failed (' + res.status + '), trying password grant...');
+  const credentials = Buffer.from(WSO2_CONSUMER_KEY + ':' + WSO2_CONSUMER_SECRET).toString('base64');
+  const pwRes = await makeRequest(
+    'POST', '/oauth2/token',
+    'grant_type=password&username=' + encodeURIComponent(S4_USERNAME) + '&password=' + encodeURIComponent(S4_PASSWORD),
+    { 'Authorization': 'Basic ' + credentials, 'Content-Type': 'application/x-www-form-urlencoded' },
+    TOKEN_PORT
+  );
+
+  console.log('Password grant response:', pwRes.status);
+
+  if (pwRes.status === 200 && pwRes.data.access_token) {
+    s4Token = pwRes.data.access_token;
+    s4TokenExpiry = Date.now() + ((pwRes.data.expires_in || 3600) - 300) * 1000;
+    console.log('Using password grant token as S4 fallback');
+    return s4Token;
+  }
+
+  throw new Error('S4 auth failed. Login: ' + res.status + '. PwGrant: ' + pwRes.status);
 }
 
 exports.handler = async (event) => {
@@ -124,125 +139,93 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Verificar que las credenciales esten configuradas
-    if (!WSO2_CONSUMER_KEY || !WSO2_CONSUMER_SECRET) {
-      return {
-        statusCode: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Credenciales API no configuradas en Netlify' }),
-      };
+    if (!WSO2_CONSUMER_KEY || !WSO2_CONSUMER_SECRET || !S4_USERNAME || !S4_PASSWORD) {
+      return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Credenciales API no configuradas en Netlify' }) };
     }
 
-    // Parsear la accion del request
     const body = event.body ? JSON.parse(event.body) : {};
     const { action, params } = body;
 
-    // Obtener token OAuth2
-    const token = await getAccessToken();
+    const gatewayToken = await getWso2Token();
+    let s4AccessToken = null;
+    try { s4AccessToken = await getS4Token(); } catch (err) { console.error('S4 auth failed:', err.message); }
 
-    const authHeaders = {
-      'Authorization': `Bearer ${token}`,
-    };
+    // AUTH: Authorization Bearer para gateway, header "token" para backend S4
+    const authHeaders = { 'Authorization': 'Bearer ' + gatewayToken };
+    if (s4AccessToken) { authHeaders['token'] = s4AccessToken; }
 
     let result;
 
     switch (action) {
-      case 'farms': {
+      case 'farms':
         result = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         break;
-      }
-
-      case 'kpis_sitio1': {
-        const path = '/sitio1-swine-default/v1/swine/reproductive/kpis';
-        result = await makeRequest('POST', path, params, authHeaders);
+      case 'kpis_sitio1':
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/kpis', params, authHeaders);
         break;
-      }
-
-      case 'kpis_sitio2': {
-        const path = '/swinekpisdefault/v1/nursery/kpis';
-        result = await makeRequest('POST', path, params, authHeaders);
+      case 'kpis_sitio2':
+        result = await makeRequest('POST', '/swinekpisdefault/v1/nursery/kpis', params, authHeaders);
         break;
-      }
-
-      case 'kpis_sitio3': {
-        const path = '/swinekpisdefault/v1/finishing/kpis';
-        result = await makeRequest('POST', path, params, authHeaders);
+      case 'kpis_sitio3':
+        result = await makeRequest('POST', '/swinekpisdefault/v1/finishing/kpis', params, authHeaders);
         break;
-      }
-
-      case 'kpis_weantofinish': {
-        const path = '/swinekpisdefault/v1/weantofinish/kpis';
-        result = await makeRequest('POST', path, params, authHeaders);
+      case 'kpis_weantofinish':
+        result = await makeRequest('POST', '/swinekpisdefault/v1/weantofinish/kpis', params, authHeaders);
         break;
-      }
-
       case 'servicios': {
-        const gender = params.gender || 'female';
-        const path = `/sitio1-swine-default/v1/swine/reproductive/mating-list/${gender}`;
-        result = await makeRequest('POST', path, params, authHeaders);
+        const g1 = (params && params.gender) || 'female';
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/mating-list/' + g1, params, authHeaders);
         break;
       }
-
       case 'partos': {
-        const gender = params.gender || 'female';
-        const path = `/sitio1-swine-default/v1/swine/reproductive/farrowing-list/${gender}`;
-        result = await makeRequest('POST', path, params, authHeaders);
+        const g2 = (params && params.gender) || 'female';
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list/' + g2, params, authHeaders);
         break;
       }
-
       case 'destetes': {
-        const gender = params.gender || 'female';
-        const path = `/sitio1-swine-default/v1/swine/reproductive/weaning-list/${gender}`;
-        result = await makeRequest('POST', path, params, authHeaders);
+        const g3 = (params && params.gender) || 'female';
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list/' + g3, params, authHeaders);
         break;
       }
-
       case 'movimientos': {
-        const gender = params.gender || 'female';
-        const path = `/sitio1-swine-default/v1/swine/reproductive/fostering-piglet-list/${gender}`;
-        result = await makeRequest('POST', path, params, authHeaders);
+        const g4 = (params && params.gender) || 'female';
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/fostering-piglet-list/' + g4, params, authHeaders);
         break;
       }
-
       case 'muertes_lechones': {
-        const gender = params.gender || 'female';
-        const path = `/sitio1-swine-default/v1/swine/reproductive/piglet-death-list/${gender}`;
-        result = await makeRequest('POST', path, params, authHeaders);
+        const g5 = (params && params.gender) || 'female';
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/piglet-death-list/' + g5, params, authHeaders);
         break;
       }
-
-      case 'salidas_lotes': {
-        const path = '/events-farm-sitio2-3-default/v1/swine/farm/animal-group/output';
-        result = await makeRequest('POST', path, params, authHeaders);
+      case 'salidas_lotes':
+        result = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/swine/farm/animal-group/output', params, authHeaders);
         break;
-      }
-
       case 'health': {
-        const farms = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
-        result = { status: 200, data: { ok: true, farms: farms.data } };
+        const loginRes = await makeRequest('POST', '/sitio1-swine-default/api/v1/login', {
+          username: S4_USERNAME, password: S4_PASSWORD,
+        }, { 'Authorization': 'Bearer ' + gatewayToken });
+        const farmsRes = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
+        result = { status: 200, data: {
+          ok: true,
+          wso2_token: gatewayToken ? 'ok' : 'MISSING',
+          s4_token: s4AccessToken ? 'ok' : 'MISSING',
+          login_test: { status: loginRes.status, body: loginRes.data },
+          farms_test: { status: farmsRes.status, body: farmsRes.data },
+        }};
         break;
       }
-
       default:
-        return {
-          statusCode: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: `Accion desconocida: ${action}` }),
-        };
+        return { statusCode: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Accion desconocida: ' + action }) };
     }
 
-    return {
-      statusCode: result.status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify(result.data),
-    };
+    return { statusCode: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify(result.data) };
 
   } catch (err) {
     console.error('Proxy error:', err);
-    return {
-      statusCode: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: err.message }),
-    };
+    return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: err.message }) };
   }
 };
