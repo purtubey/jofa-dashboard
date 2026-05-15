@@ -51,7 +51,7 @@ function makeRequest(method, path, body, headers) {
 async function getS4Token() {
   if (s4Token && Date.now() < s4TokenExpiry) return s4Token;
 
-  const res = await makeRequest('POST', '/api/v1/login', {
+  const res = await makeRequest('POST', '/sitio1-swine-default/api/v1/login', {
     username: S4_USERNAME,
     password: S4_PASSWORD,
   }, {
@@ -105,7 +105,7 @@ exports.handler = async (event) => {
 
     switch (action) {
       case 'farms': {
-        result = await makeRequest('GET', '/api/v1/farms', null, authHeaders);
+        result = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         break;
       }
 
@@ -176,7 +176,7 @@ exports.handler = async (event) => {
 
       case 'health': {
         // Health check - intenta autenticar y listar granjas
-        const farms = await makeRequest('GET', '/api/v1/farms', null, authHeaders);
+        const farms = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         result = { status: 200, data: { ok: true, farms: farms.data } };
         break;
       }
