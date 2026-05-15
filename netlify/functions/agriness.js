@@ -4,7 +4,7 @@
 const https = require('https');
 
 const AGRINESS_HOST = 'am.agriness.com';
-const AGRINESS_PORT = 9443;
+const AGRINESS_PORT = 8243;
 
 // Credenciales desde variables de entorno de Netlify
 const WSO2_API_KEY = process.env.WSO2_API_KEY || '';
