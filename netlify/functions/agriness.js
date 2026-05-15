@@ -1,6 +1,6 @@
 // Netlify Serverless Function — Proxy para Agriness S4 API
 // Protege credenciales y evita CORS
-// Auth: OAuth2 Client Credentials → WSO2 Gateway + S4 Login
+// Auth: OAuth2 Client Credentials → WSO2 Gateway (sin S4 login separado)
 
 const https = require('https');
 
@@ -14,11 +14,9 @@ const WSO2_CONSUMER_SECRET = process.env.WSO2_CONSUMER_SECRET || '';
 const S4_USERNAME = process.env.S4_USERNAME || '';
 const S4_PASSWORD = process.env.S4_PASSWORD || '';
 
-// Cache de tokens
-let wso2Token = null;
-let wso2TokenExpiry = 0;
-let s4Token = null;
-let s4TokenExpiry = 0;
+// Cache del token OAuth2
+let accessToken = null;
+let tokenExpiry = 0;
 
 function makeRequest(method, path, body, headers, port) {
   port = port || API_PORT;
@@ -59,12 +57,40 @@ function makeRequest(method, path, body, headers, port) {
   });
 }
 
-// Paso 1: Obtener token OAuth2 del gateway WSO2 (client_credentials grant)
-async function getWso2Token() {
-  if (wso2Token && Date.now() < wso2TokenExpiry) return wso2Token;
+// Obtener token OAuth2 del gateway WSO2
+// Intenta password grant primero (incluye contexto de usuario S4),
+// si falla usa client_credentials grant
+async function getAccessToken() {
+  if (accessToken && Date.now() < tokenExpiry) return accessToken;
 
   const credentials = Buffer.from(`${WSO2_CONSUMER_KEY}:${WSO2_CONSUMER_SECRET}`).toString('base64');
 
+  // Intentar password grant (combina gateway auth + user context)
+  try {
+    const pwBody = `grant_type=password&username=${encodeURIComponent(S4_USERNAME)}&password=${encodeURIComponent(S4_PASSWORD)}`;
+    const res = await makeRequest(
+      'POST',
+      '/oauth2/token',
+      pwBody,
+      {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      TOKEN_PORT
+    );
+
+    if (res.status === 200 && res.data.access_token) {
+      accessToken = res.data.access_token;
+      tokenExpiry = Date.now() + ((res.data.expires_in || 3600) - 300) * 1000;
+      console.log('OAuth2 password grant token obtained, expires in', res.data.expires_in, 's');
+      return accessToken;
+    }
+    console.log('Password grant failed:', res.status, JSON.stringify(res.data));
+  } catch (e) {
+    console.log('Password grant error:', e.message);
+  }
+
+  // Fallback: client_credentials grant
   const res = await makeRequest(
     'POST',
     '/oauth2/token',
@@ -77,36 +103,13 @@ async function getWso2Token() {
   );
 
   if (res.status === 200 && res.data.access_token) {
-    wso2Token = res.data.access_token;
-    wso2TokenExpiry = Date.now() + ((res.data.expires_in || 3600) - 300) * 1000;
-    console.log('WSO2 OAuth2 token obtained, expires in', res.data.expires_in, 's');
-    return wso2Token;
+    accessToken = res.data.access_token;
+    tokenExpiry = Date.now() + ((res.data.expires_in || 3600) - 300) * 1000;
+    console.log('OAuth2 client_credentials token obtained, expires in', res.data.expires_in, 's');
+    return accessToken;
   }
 
-  throw new Error(`WSO2 OAuth2 failed: ${res.status} - ${JSON.stringify(res.data)}`);
-}
-
-// Paso 2: Login S4 para obtener token Agriness (a traves del gateway)
-async function getS4Token() {
-  if (s4Token && Date.now() < s4TokenExpiry) return s4Token;
-
-  const gatewayToken = await getWso2Token();
-
-  const res = await makeRequest('POST', '/sitio1-swine-default/api/v1/login', {
-    username: S4_USERNAME,
-    password: S4_PASSWORD,
-  }, {
-    'Authorization': `Bearer ${gatewayToken}`,
-  });
-
-  if (res.status === 200 && res.data.access_token) {
-    s4Token = res.data.access_token;
-    s4TokenExpiry = Date.now() + ((res.data.expires_in || 3600) - 300) * 1000;
-    console.log('S4 token obtained, expires in', res.data.expires_in, 's');
-    return s4Token;
-  }
-
-  throw new Error(`S4 login failed: ${res.status} - ${JSON.stringify(res.data)}`);
+  throw new Error(`OAuth2 failed: ${res.status} - ${JSON.stringify(res.data)}`);
 }
 
 exports.handler = async (event) => {
@@ -122,7 +125,7 @@ exports.handler = async (event) => {
 
   try {
     // Verificar que las credenciales esten configuradas
-    if (!WSO2_CONSUMER_KEY || !WSO2_CONSUMER_SECRET || !S4_USERNAME || !S4_PASSWORD) {
+    if (!WSO2_CONSUMER_KEY || !WSO2_CONSUMER_SECRET) {
       return {
         statusCode: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -134,13 +137,11 @@ exports.handler = async (event) => {
     const body = event.body ? JSON.parse(event.body) : {};
     const { action, params } = body;
 
-    // Obtener ambos tokens (WSO2 gateway + S4)
-    const gatewayToken = await getWso2Token();
-    const s4AccessToken = await getS4Token();
+    // Obtener token OAuth2
+    const token = await getAccessToken();
 
-    // Para las llamadas API usamos el gatewayToken (WSO2 OAuth2).
     const authHeaders = {
-      'Authorization': `Bearer ${gatewayToken}`,
+      'Authorization': `Bearer ${token}`,
     };
 
     let result;
@@ -217,7 +218,6 @@ exports.handler = async (event) => {
       }
 
       case 'health': {
-        // Health check - verifica autenticacion y lista granjas
         const farms = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         result = { status: 200, data: { ok: true, farms: farms.data } };
         break;
