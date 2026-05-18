@@ -9,7 +9,7 @@ const API_PORT = 8243;    // WSO2 API Gateway
 const TOKEN_PORT = 9443;  // WSO2 OAuth2 Token Endpoint
 
 // Credenciales desde variables de entorno de Netlify
-const WSO2_CONSUMER_KEY = process.env.WSO2_COSUMER_KEY || '';
+const WSO2_CONSUMER_KEY = process.env.WSO2_CONSUMER_KEY || '';
 const WSO2_CONSUMER_SECRET = process.env.WSO2_CONSUMER_SECRET || '';
 const S4_USERNAME = process.env.S4_USERNAME || '';
 const S4_PASSWORD = process.env.S4_PASSWORD || '';
