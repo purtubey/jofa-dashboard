@@ -627,7 +627,7 @@ body {
 
   function extractKpiValue(data, kpiCode) {
     // data can be array of results or object with results array
-    let results = Array.isArray(data) ? data : (data && data.results ? data.results : []);
+    let results = Array.isArray(data) ? data : (data && data.data ? data.data : (data && data.results ? data.results : []));
     if (!Array.isArray(results)) results = [results];
     for (const r of results) {
       if (r.kpis) {
@@ -648,7 +648,7 @@ body {
 
   function extractKpiMonthly(data, kpiCode) {
     // returns array of {month, value}
-    let results = Array.isArray(data) ? data : (data && data.results ? data.results : []);
+    let results = Array.isArray(data) ? data : (data && data.data ? data.data : (data && data.results ? data.results : []));
     if (!Array.isArray(results)) results = [results];
     const out = [];
     for (const r of results) {
@@ -782,12 +782,12 @@ body {
       let farms = [];
       if (Array.isArray(data)) farms = data;
       else if (data && data.farms) farms = data.farms;
-      else if (data && data.results) farms = data.results;
+      else if (data && data.data) farms = data.data;            else if (data && data.results) farms = data.results;
       else if (data && data.id) farms = [data];
 
       if (farms.length > 0) {
         const farm = farms[0];
-        state.farmId = farm.id || farm.uuid || farm.farm_id;
+        state.farmId = farm.id || farm.uuid || farm.farm_uuid || farm.farm_id;
         state.farmName = farm.name || farm.farm_name || 'JOFA S.A.';
         state.connected = true;
         dot.className = 'status-dot ok';
@@ -818,10 +818,10 @@ body {
 
   async function loadFarms() {
     const data = await apiCall('farms');
-    let farms = Array.isArray(data) ? data : (data && data.results ? data.results : []);
+    let farms = Array.isArray(data) ? data : (data && data.data ? data.data : (data && data.results ? data.results : []));
     if (farms.length > 0) {
       const farm = farms[0];
-      state.farmId = farm.id || farm.uuid || farm.farm_id;
+      state.farmId = farm.id || farm.uuid || farm.farm_uuid || farm.farm_id;
       state.farmName = farm.name || farm.farm_name || 'JOFA S.A.';
       state.connected = true;
       const dot = document.getElementById('statusDot');
