@@ -162,16 +162,16 @@ exports.handler = async (event) => {
         result = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         break;
       case 'kpis_sitio1':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/reproductive/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/kpis', params, authHeaders);
         break;
       case 'kpis_sitio2':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/nursery/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/nursery/kpis', params, authHeaders);
         break;
       case 'kpis_sitio3':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/finishing/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/finishing/kpis', params, authHeaders);
         break;
       case 'kpis_weantofinish':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/weantofinish/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/weantofinish/kpis', params, authHeaders);
         break;
       case 'servicios': {
         const g1 = (params && params.gender) || 'female';
