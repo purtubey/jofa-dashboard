@@ -1,24 +1,27 @@
 // Netlify Serverless Function — Proxy para Agriness S4 API
 // Protege credenciales y evita CORS
-// Auth: OAuth2 Client Credentials → WSO2 Gateway + S4 Login → header "token"
+// Auth: OAuth2 Client Credentials + API Key → WSO2 Gateway + S4 Login → header "token" / "HTTP-AUTHORIZATION"
 
 const https = require('https');
 
 const AGRINESS_HOST = 'am.agriness.com';
-const API_PORT = 8243;    // WSO2 API Gateway
-const TOKEN_PORT = 9443;  // WSO2 OAuth2 Token Endpoint
+const API_PORT = 8243;   // WSO2 API Gateway
+const TOKEN_PORT = 9443; // WSO2 OAuth2 Token Endpoint
 
 // Credenciales desde variables de entorno de Netlify
 const WSO2_CONSUMER_KEY = process.env.WSO2_CONSUMER_KEY || '';
 const WSO2_CONSUMER_SECRET = process.env.WSO2_CONSUMER_SECRET || '';
 const S4_USERNAME = process.env.S4_USERNAME || '';
 const S4_PASSWORD = process.env.S4_PASSWORD || '';
+const WSO2_API_KEY = process.env.WSO2_API_KEY || '';
 
 // Cache de tokens
 let wso2Token = null;
 let wso2TokenExpiry = 0;
 let s4Token = null;
 let s4TokenExpiry = 0;
+let kpiToken = null;
+let kpiTokenExpiry = 0;
 
 function makeRequest(method, path, body, headers, port) {
   port = port || API_PORT;
@@ -77,8 +80,8 @@ async function getWso2Token() {
   throw new Error('WSO2 OAuth2 failed: ' + res.status + ' - ' + JSON.stringify(res.data));
 }
 
-// Login S4: devuelve { data: { token: "..." } }
-// Ese token se pasa como header "token" en llamadas API
+// Login S4 (sitio1): devuelve { data: { token: "..." } }
+// Ese token se pasa como header "token" en llamadas sitio1
 async function getS4Token() {
   if (s4Token && Date.now() < s4TokenExpiry) return s4Token;
 
@@ -127,6 +130,45 @@ async function getS4Token() {
   throw new Error('S4 auth failed. Login: ' + res.status + '. PwGrant: ' + pwRes.status);
 }
 
+// Login KPI API: usa apikey para gateway, devuelve access_token para HTTP-AUTHORIZATION
+async function getKpiToken() {
+  if (kpiToken && Date.now() < kpiTokenExpiry) return kpiToken;
+
+  console.log('Attempting KPI login via /swinekpisdefault/api/v1/login');
+
+  const headers = { 'Content-Type': 'application/json' };
+  // Usar API Key para gateway auth en KPI API
+  if (WSO2_API_KEY) {
+    headers['apikey'] = WSO2_API_KEY;
+  } else {
+    // Fallback a Bearer token si no hay API Key
+    const gatewayToken = await getWso2Token();
+    headers['Authorization'] = 'Bearer ' + gatewayToken;
+  }
+
+  const res = await makeRequest('POST', '/swinekpisdefault/api/v1/login', {
+    username: S4_USERNAME,
+    password: S4_PASSWORD,
+  }, headers);
+
+  console.log('KPI login response:', res.status, JSON.stringify(res.data).substring(0, 300));
+
+  if (res.status === 200) {
+    const token = res.data.access_token || (res.data.data && res.data.data.token) || res.data.token;
+    if (token) {
+      kpiToken = token;
+      // access_token expires in ~518400s (6 days), refresh before that
+      const expiresIn = res.data.expires_in || 518400;
+      kpiTokenExpiry = Date.now() + (expiresIn - 600) * 1000;
+      console.log('KPI token obtained, expires in', expiresIn, 's, length:', token.length);
+      return kpiToken;
+    }
+    console.error('KPI login 200 but no token:', JSON.stringify(res.data));
+  }
+
+  throw new Error('KPI login failed: ' + res.status + ' - ' + JSON.stringify(res.data).substring(0, 500));
+}
+
 exports.handler = async (event) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -147,13 +189,34 @@ exports.handler = async (event) => {
     const body = event.body ? JSON.parse(event.body) : {};
     const { action, params } = body;
 
+    // Auth para sitio1 (farms, servicios, partos, destetes, etc.)
     const gatewayToken = await getWso2Token();
     let s4AccessToken = null;
     try { s4AccessToken = await getS4Token(); } catch (err) { console.error('S4 auth failed:', err.message); }
 
-    // AUTH: Authorization Bearer para gateway, header "token" para backend S4
     const authHeaders = { 'Authorization': 'Bearer ' + gatewayToken };
     if (s4AccessToken) { authHeaders['token'] = s4AccessToken; }
+
+    // Auth para KPI API (usa apikey + HTTP-AUTHORIZATION)
+    let kpiHeaders = null;
+    const isKpiAction = action && action.startsWith('kpis_');
+    if (isKpiAction) {
+      try {
+        const kpiAccessToken = await getKpiToken();
+        kpiHeaders = { 'Content-Type': 'application/json' };
+        if (WSO2_API_KEY) {
+          kpiHeaders['apikey'] = WSO2_API_KEY;
+        } else {
+          kpiHeaders['Authorization'] = 'Bearer ' + gatewayToken;
+        }
+        kpiHeaders['HTTP-AUTHORIZATION'] = kpiAccessToken;
+        console.log('KPI headers ready, HTTP-AUTHORIZATION length:', kpiAccessToken.length);
+      } catch (err) {
+        console.error('KPI auth failed:', err.message);
+        // Fallback: try with standard auth
+        kpiHeaders = { ...authHeaders };
+      }
+    }
 
     let result;
 
@@ -162,70 +225,49 @@ exports.handler = async (event) => {
         result = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         break;
       case 'kpis_sitio1':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/reproductive/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/reproductive/kpis', params, kpiHeaders || authHeaders);
         break;
       case 'kpis_sitio2':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/nursery/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/nursery/kpis', params, kpiHeaders || authHeaders);
         break;
       case 'kpis_sitio3':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/finishing/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/finishing/kpis', params, kpiHeaders || authHeaders);
         break;
       case 'kpis_weantofinish':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/weantofinish/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/weantofinish/kpis', params, kpiHeaders || authHeaders);
         break;
       case 'servicios': {
         const g1 = (params && params.gender) || 'female';
         result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/mating-list/' + g1, params, authHeaders);
         break;
       }
-      case 'partos': {
-        const g2 = (params && params.gender) || 'female';
-        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list/' + g2, params, authHeaders);
+      case 'partos':
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list', params, authHeaders);
         break;
-      }
-      case 'destetes': {
-        const g3 = (params && params.gender) || 'female';
-        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list/' + g3, params, authHeaders);
+      case 'destetes':
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list', params, authHeaders);
         break;
-      }
-      case 'movimientos': {
-        const g4 = (params && params.gender) || 'female';
-        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/fostering-piglet-list/' + g4, params, authHeaders);
+      case 'eventos':
+        result = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/events', params, authHeaders);
         break;
-      }
-      case 'muertes_lechones': {
-        const g5 = (params && params.gender) || 'female';
-        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/piglet-death-list/' + g5, params, authHeaders);
-        break;
-      }
-      case 'salidas_lotes':
-        result = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/swine/farm/animal-group/output', params, authHeaders);
-        break;
-      case 'health': {
-        const loginRes = await makeRequest('POST', '/sitio1-swine-default/api/v1/login', {
-          username: S4_USERNAME, password: S4_PASSWORD,
-        }, { 'Authorization': 'Bearer ' + gatewayToken });
-        const farmsRes = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
-        result = { status: 200, data: {
-          ok: true,
-          wso2_token: gatewayToken ? 'ok' : 'MISSING',
-          s4_token: s4AccessToken ? 'ok' : 'MISSING',
-          login_test: { status: loginRes.status, body: loginRes.data },
-          farms_test: { status: farmsRes.status, body: farmsRes.data },
-        }};
-        break;
-      }
       default:
         return { statusCode: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'Accion desconocida: ' + action }) };
+          body: JSON.stringify({ error: 'Accion no reconocida: ' + action }) };
     }
 
-    return { statusCode: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify(result.data) };
+    console.log('API response for', action, ':', result.status, JSON.stringify(result.data).substring(0, 200));
 
-  } catch (err) {
-    console.error('Proxy error:', err);
-    return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: err.message }) };
+    return {
+      statusCode: result.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify(result.data),
+    };
+  } catch (error) {
+    console.error('Proxy error:', error.message);
+    return {
+      statusCode: 502,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Error de proxy: ' + error.message }),
+    };
   }
 };
