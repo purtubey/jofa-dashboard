@@ -9,7 +9,7 @@ const API_PORT = 8243;    // WSO2 API Gateway
 const TOKEN_PORT = 9443;  // WSO2 OAuth2 Token Endpoint
 
 // Credenciales desde variables de entorno de Netlify
-const WSO2_CONSUMER_KEY = process.env.WSO2_CONSUMER_KEY || '';
+const WSO2_CONSUMER_KEY = process.env.WSO2_COSUMER_KEY || '';
 const WSO2_CONSUMER_SECRET = process.env.WSO2_CONSUMER_SECRET || '';
 const S4_USERNAME = process.env.S4_USERNAME || '';
 const S4_PASSWORD = process.env.S4_PASSWORD || '';
@@ -162,16 +162,16 @@ exports.handler = async (event) => {
         result = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         break;
       case 'kpis_sitio1':
-        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/reproductive/kpis', params, authHeaders);
         break;
       case 'kpis_sitio2':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/nursery/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/nursery/kpis', params, authHeaders);
         break;
       case 'kpis_sitio3':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/finishing/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/finishing/kpis', params, authHeaders);
         break;
       case 'kpis_weantofinish':
-        result = await makeRequest('POST', '/swinekpisdefault/v1/weantofinish/kpis', params, authHeaders);
+        result = await makeRequest('POST', '/swinekpisdefault/v1/swine/weantofinish/kpis', params, authHeaders);
         break;
       case 'servicios': {
         const g1 = (params && params.gender) || 'female';
