@@ -631,10 +631,14 @@ body {
     if (!Array.isArray(results)) results = [results];
     for (const r of results) {
       if (r.kpis) {
-        for (const k of r.kpis) {
-          if (k.code === kpiCode || k.kpi === kpiCode) return k.value;
-        }
-      }
+if (!Array.isArray(r.kpis) && typeof r.kpis === 'object') {
+if (r.kpis[kpiCode] !== undefined) return r.kpis[kpiCode];
+} else {
+for (const k of r.kpis) {
+if (k.code === kpiCode || k.kpi === kpiCode) return k.value;
+}
+}
+}
       if (r.code === kpiCode || r.kpi === kpiCode) return r.value;
     }
     // try flat search
@@ -654,12 +658,18 @@ body {
     for (const r of results) {
       let period = r.date || r.period || r.year_month || '';
       if (r.kpis) {
-        for (const k of r.kpis) {
-          if (k.code === kpiCode || k.kpi === kpiCode) {
-            out.push({ month: period, value: k.value });
-          }
-        }
-      }
+if (!Array.isArray(r.kpis) && typeof r.kpis === 'object') {
+if (r.kpis[kpiCode] !== undefined) {
+out.push({ month: period, value: r.kpis[kpiCode] });
+}
+} else {
+for (const k of r.kpis) {
+if (k.code === kpiCode || k.kpi === kpiCode) {
+out.push({ month: period, value: k.value });
+}
+}
+}
+}
     }
     return out;
   }
