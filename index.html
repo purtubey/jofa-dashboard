@@ -281,6 +281,51 @@ body {
     .kpi-current .cur-delta.up-bad { color: var(--red); }
     .kpi-current .cur-delta.down-good { color: var(--green); }
     .kpi-current .cur-delta.down-bad { color: var(--red); }
+
+    /* Panel expandible Stock Madres */
+    #kpi-stock { cursor: pointer; transition: border-color 0.2s; }
+    #kpi-stock:hover { border-color: var(--blue); }
+    #kpi-stock .kpi-label::after { content: ' \25BC'; font-size: 9px; color: var(--text-3); }
+    #kpi-stock.expanded .kpi-label::after { content: ' \25B2'; }
+
+    .stock-panel {
+      display: none; grid-column: 1 / -1;
+      background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: var(--radius);
+      padding: 20px 24px; margin-top: -4px;
+      animation: panelSlide 0.3s ease;
+    }
+    .stock-panel.open { display: block; }
+    @keyframes panelSlide { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .stock-panel-grid {
+      display: grid; grid-template-columns: 220px 1fr 1fr; gap: 20px; align-items: start;
+    }
+    @media (max-width: 900px) { .stock-panel-grid { grid-template-columns: 1fr; } }
+
+    .stock-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 12px 0; }
+
+    /* Donut chart */
+    .donut-wrap { display: flex; flex-direction: column; align-items: center; }
+    .donut-legend { margin-top: 12px; width: 100%; }
+    .donut-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-1); margin-bottom: 5px; }
+    .donut-legend-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .donut-legend-item .dl-val { margin-left: auto; font-weight: 600; color: var(--text-0); }
+
+    /* Flow stats */
+    .flow-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--bg-2); font-size: 13px; }
+    .flow-row:last-child { border-bottom: none; }
+    .flow-label { color: var(--text-2); }
+    .flow-val { font-weight: 600; color: var(--text-0); }
+    .flow-val.in { color: var(--green); }
+    .flow-val.out { color: var(--red); }
+
+    /* Mini KPI row */
+    .mini-kpi { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--bg-2); font-size: 13px; }
+    .mini-kpi:last-child { border-bottom: none; }
+    .mini-kpi .mk-label { color: var(--text-2); }
+    .mini-kpi .mk-val { font-weight: 600; color: var(--text-0); }
+
+    .stock-loading { text-align: center; padding: 30px; color: var(--text-3); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -320,6 +365,25 @@ body {
         <div class="kpi-card" id="kpi-nv"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Nacidos Vivos Promedio</div><div class="tt-desc">Promedio de lechones nacidos vivos por parto. Indicador de prolificidad genética y manejo.</div><div class="tt-calc">Calculo: Total nacidos vivos ÷ Total partos</div><div class="tt-ref">Ref: Top: >14.5 | Bueno: 13-14.5 | Promedio: 11.5-13</div></div></div>
         <div class="kpi-card" id="kpi-mpd"><div class="kpi-label">Mort. Pre-Destete</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que mueren antes del destete. Refleja calidad de manternidad.</div><div class="tt-calc">Calculo: (Muertos en lactancia ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
         <div class="kpi-card" id="kpi-dnp"><div class="kpi-label">Dias No Productivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Días No Productivos</div><div class="tt-desc">Días en que la hembra no está preñada ni lactando. Impactan directamente el PSY y la rentabilidad.</div><div class="tt-calc">Calculo: Días vacíos + días de repeticiones + días de descarte no productivo</div><div class="tt-ref">Ref: Excelente: <30 | Aceptable: 30-45 | Alerta: >50</div></div></div>
+        <!-- Panel expandible Stock Madres -->
+        <div class="stock-panel" id="stock-panel">
+          <div class="stock-loading" id="stock-panel-loading">Cargando desglose del plantel...</div>
+          <div class="stock-panel-grid" id="stock-panel-content" style="display:none;">
+            <div class="donut-wrap">
+              <h4>Estado Reproductivo</h4>
+              <div id="stock-donut"></div>
+              <div class="donut-legend" id="stock-donut-legend"></div>
+            </div>
+            <div>
+              <h4>Flujo del Plantel (periodo)</h4>
+              <div id="stock-flow"></div>
+            </div>
+            <div>
+              <h4>Indicadores del Plantel</h4>
+              <div id="stock-indicators"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="section">
@@ -1231,6 +1295,148 @@ out.push({ month: period, value: k.value });
       loadTrendChart('chart-ind-gdp', 'sitio3', 'DAILY_WEIGHT_GAIN_STAGE', BENCHMARKS.GDP, '#2ecc8b'),
       loadTrendChart('chart-ind-conv', 'sitio3', 'FEED_CONVERSION_RATIO_STAGE', BENCHMARKS.FEED_CONV, '#f0c040')
     ]);
+  }
+
+  // ---- STOCK MADRES PANEL ----
+  let stockPanelLoaded = false;
+
+  document.getElementById('kpi-stock').addEventListener('click', function(e) {
+    // Don't toggle if clicking tooltip
+    if (e.target.closest('.kpi-tooltip')) return;
+    const panel = document.getElementById('stock-panel');
+    const card = this;
+    const isOpen = panel.classList.contains('open');
+    panel.classList.toggle('open');
+    card.classList.toggle('expanded');
+    if (!isOpen && !stockPanelLoaded) {
+      loadStockPanel();
+    }
+  });
+
+  async function loadStockPanel() {
+    const start = monthStart(-5);
+    const end = today();
+    const loading = document.getElementById('stock-panel-loading');
+    const content = document.getElementById('stock-panel-content');
+
+    try {
+      const stockKpis = [
+        'ACTIVE_SOWS_INVENTORY','ACTIVE_GILTS_INVENTORY','ACTIVE_BOARS_INVENTORY',
+        'ACTIVE_OPEN_SOWS_INVENTORY','ACTIVE_PREGNANT_SOWS_INVENTORY','ACTIVE_LACTATING_SOWS_INVENTORY',
+        'PIGLET_INVENTORY',
+        'TOTAL_PURCHASES_GILTS','TOTAL_PURCHASES_SOWS',
+        'TOTAL_SALES_SOWS','TOTAL_SALES_GILTS',
+        'TOTAL_DEATHS_ACTIVE_SOW','TOTAL_DEATHS_ACTIVE_GILTS',
+        'CULLED_SOWS_INVENTORY','CULLED_GILTS_INVENTORY',
+        'RATE_REPLACEMENT_SOWS','RATE_MORTALITY_FEMALES',
+        'AVERAGE_FIRST_SERVICE_AGE','LITTERS_FEMALE_YEAR',
+        'AVERAGE_GESTATION_DAYS','AVERAGE_LACTATING_DAYS'
+      ];
+
+      const data = await fetchKpis('sitio1', stockKpis, start, end, 'farm_id');
+      const v = (code) => extractKpiValue(data, code);
+
+      // --- DONUT CHART ---
+      const gestantes = v('ACTIVE_PREGNANT_SOWS_INVENTORY') || 0;
+      const lactando = v('ACTIVE_LACTATING_SOWS_INVENTORY') || 0;
+      const vacias = v('ACTIVE_OPEN_SOWS_INVENTORY') || 0;
+      const primerizas = v('ACTIVE_GILTS_INVENTORY') || 0;
+      const total = gestantes + lactando + vacias + primerizas || 1;
+
+      const segments = [
+        { label: 'Gestantes', value: gestantes, color: '#4f7df5' },
+        { label: 'Lactando', value: lactando, color: '#f0c040' },
+        { label: 'Vacias', value: vacias, color: '#2ecc8b' },
+        { label: 'Primerizas', value: primerizas, color: '#a78bfa' }
+      ];
+
+      // SVG donut
+      const R = 70, r = 45, cx = 90, cy = 90;
+      let angle = -90;
+      let paths = '';
+      segments.forEach(seg => {
+        if (seg.value <= 0) return;
+        const pct = seg.value / total;
+        const a1 = angle * Math.PI / 180;
+        const a2 = (angle + pct * 360) * Math.PI / 180;
+        const large = pct > 0.5 ? 1 : 0;
+        const x1o = cx + R * Math.cos(a1), y1o = cy + R * Math.sin(a1);
+        const x2o = cx + R * Math.cos(a2), y2o = cy + R * Math.sin(a2);
+        const x1i = cx + r * Math.cos(a2), y1i = cy + r * Math.sin(a2);
+        const x2i = cx + r * Math.cos(a1), y2i = cy + r * Math.sin(a1);
+        paths += '<path d="M' + x1o + ',' + y1o + ' A' + R + ',' + R + ' 0 ' + large + ' 1 ' + x2o + ',' + y2o + ' L' + x1i + ',' + y1i + ' A' + r + ',' + r + ' 0 ' + large + ' 0 ' + x2i + ',' + y2i + ' Z" fill="' + seg.color + '" opacity="0.85"><title>' + seg.label + ': ' + seg.value + '</title></path>';
+        angle += pct * 360;
+      });
+      const donutSvg = '<svg viewBox="0 0 180 180" style="width:160px;height:160px;">' + paths
+        + '<text x="' + cx + '" y="' + (cy - 6) + '" text-anchor="middle" fill="var(--text-0)" font-size="22" font-weight="700">' + fmtInt(total) + '</text>'
+        + '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" fill="var(--text-3)" font-size="10">Total</text>'
+        + '</svg>';
+      document.getElementById('stock-donut').innerHTML = donutSvg;
+
+      // Legend
+      let legendHtml = '';
+      segments.forEach(seg => {
+        const pct = total > 0 ? ((seg.value / total) * 100).toFixed(0) : 0;
+        legendHtml += '<div class="donut-legend-item"><span class="dot" style="background:' + seg.color + '"></span>' + seg.label + ' (' + pct + '%)<span class="dl-val">' + fmtInt(seg.value) + '</span></div>';
+      });
+      // Add machos and lechones
+      const machos = v('ACTIVE_BOARS_INVENTORY');
+      const lechones = v('PIGLET_INVENTORY');
+      if (machos != null) legendHtml += '<div class="donut-legend-item" style="margin-top:8px;border-top:1px solid var(--bg-3);padding-top:8px;"><span class="dot" style="background:var(--text-3)"></span>Machos activos<span class="dl-val">' + fmtInt(machos) + '</span></div>';
+      if (lechones != null) legendHtml += '<div class="donut-legend-item"><span class="dot" style="background:#f97316"></span>Lechones en maternidad<span class="dl-val">' + fmtInt(lechones) + '</span></div>';
+      document.getElementById('stock-donut-legend').innerHTML = legendHtml;
+
+      // --- FLOW ---
+      const comprasG = v('TOTAL_PURCHASES_GILTS') || 0;
+      const comprasS = v('TOTAL_PURCHASES_SOWS') || 0;
+      const ventasG = v('TOTAL_SALES_GILTS') || 0;
+      const ventasS = v('TOTAL_SALES_SOWS') || 0;
+      const muertasS = v('TOTAL_DEATHS_ACTIVE_SOW') || 0;
+      const muertasG = v('TOTAL_DEATHS_ACTIVE_GILTS') || 0;
+      const descartesS = v('CULLED_SOWS_INVENTORY') || 0;
+      const descartesG = v('CULLED_GILTS_INVENTORY') || 0;
+
+      const totalIn = comprasG + comprasS;
+      const totalOut = ventasG + ventasS + muertasS + muertasG;
+
+      let flowHtml = '';
+      flowHtml += '<div class="flow-row"><span class="flow-label">Compras primerizas</span><span class="flow-val in">+' + fmtInt(comprasG) + '</span></div>';
+      flowHtml += '<div class="flow-row"><span class="flow-label">Compras hembras</span><span class="flow-val in">+' + fmtInt(comprasS) + '</span></div>';
+      flowHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Total entradas</span><span class="flow-val in" style="font-size:15px;">+' + fmtInt(totalIn) + '</span></div>';
+      flowHtml += '<div class="flow-row" style="margin-top:10px;"><span class="flow-label">Ventas</span><span class="flow-val out">-' + fmtInt(ventasG + ventasS) + '</span></div>';
+      flowHtml += '<div class="flow-row"><span class="flow-label">Muertes</span><span class="flow-val out">-' + fmtInt(muertasS + muertasG) + '</span></div>';
+      flowHtml += '<div class="flow-row"><span class="flow-label">Descartes pendientes</span><span class="flow-val" style="color:var(--yellow);">' + fmtInt(descartesS + descartesG) + '</span></div>';
+      flowHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Total salidas</span><span class="flow-val out" style="font-size:15px;">-' + fmtInt(totalOut) + '</span></div>';
+      const net = totalIn - totalOut;
+      flowHtml += '<div class="flow-row" style="margin-top:6px;background:var(--bg-2);border-radius:6px;padding:8px 10px;"><span class="flow-label" style="font-weight:700;color:var(--text-0);">Balance neto</span><span class="flow-val" style="font-size:16px;color:' + (net >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + (net >= 0 ? '+' : '') + fmtInt(net) + '</span></div>';
+      document.getElementById('stock-flow').innerHTML = flowHtml;
+
+      // --- INDICATORS ---
+      let indHtml = '';
+      const reposicion = v('RATE_REPLACEMENT_SOWS');
+      const mortHembras = v('RATE_MORTALITY_FEMALES');
+      const edadPrimerServ = v('AVERAGE_FIRST_SERVICE_AGE');
+      const pfa = v('LITTERS_FEMALE_YEAR');
+      const diasGest = v('AVERAGE_GESTATION_DAYS');
+      const diasLact = v('AVERAGE_LACTATING_DAYS');
+
+      indHtml += '<div class="mini-kpi"><span class="mk-label">Tasa Reposicion</span><span class="mk-val">' + fmtPct(reposicion) + '</span></div>';
+      indHtml += '<div class="mini-kpi"><span class="mk-label">Mortalidad Hembras</span><span class="mk-val" style="color:' + (mortHembras > 8 ? 'var(--red)' : 'var(--text-0)') + ';">' + fmtPct(mortHembras) + '</span></div>';
+      indHtml += '<div class="mini-kpi"><span class="mk-label">Partos/Hembra/Ano (PFA)</span><span class="mk-val">' + fmtNum(pfa, 2) + '</span></div>';
+      indHtml += '<div class="mini-kpi"><span class="mk-label">Edad 1er Servicio</span><span class="mk-val">' + fmtNum(edadPrimerServ, 0) + ' dias</span></div>';
+      indHtml += '<div class="mini-kpi"><span class="mk-label">Dias Gestacion (prom)</span><span class="mk-val">' + fmtNum(diasGest, 1) + ' d</span></div>';
+      indHtml += '<div class="mini-kpi"><span class="mk-label">Dias Lactancia (prom)</span><span class="mk-val">' + fmtNum(diasLact, 1) + ' d</span></div>';
+      indHtml += '<div class="mini-kpi" style="margin-top:8px;border-top:2px solid var(--bg-3);padding-top:8px;"><span class="mk-label" style="font-weight:600;">Ciclo reproductivo</span><span class="mk-val">' + fmtNum((diasGest || 114) + (diasLact || 21) + 7, 0) + ' dias</span></div>';
+
+      document.getElementById('stock-indicators').innerHTML = indHtml;
+
+      stockPanelLoaded = true;
+      loading.style.display = 'none';
+      content.style.display = 'grid';
+    } catch (e) {
+      loading.textContent = 'Error al cargar desglose: ' + e.message;
+      console.error('Stock panel error:', e);
+    }
   }
 
   // ---- CONFIG: TEST CONNECTION ----
