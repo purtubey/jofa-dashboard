@@ -268,6 +268,19 @@ body {
     .kpi-tooltip .tt-desc { font-size: 12px; color: var(--text-1); line-height: 1.5; margin-bottom: 8px; }
     .kpi-tooltip .tt-calc { font-size: 11px; color: var(--text-2); border-top: 1px solid var(--bg-3); padding-top: 6px; margin-bottom: 4px; }
     .kpi-tooltip .tt-ref { font-size: 11px; color: var(--green); }
+
+    /* Mes actual - segunda linea comparativa */
+    .kpi-current {
+      font-size: 12px; color: var(--text-2); margin-top: 5px;
+      padding-top: 5px; border-top: 1px dashed var(--bg-3);
+    }
+    .kpi-current .cur-label { color: var(--text-3); font-size: 11px; }
+    .kpi-current .cur-val { font-weight: 600; color: var(--text-0); margin-left: 2px; }
+    .kpi-current .cur-delta { font-size: 11px; margin-left: 4px; }
+    .kpi-current .cur-delta.up-good { color: var(--green); }
+    .kpi-current .cur-delta.up-bad { color: var(--red); }
+    .kpi-current .cur-delta.down-good { color: var(--green); }
+    .kpi-current .cur-delta.down-bad { color: var(--red); }
 </style>
 </head>
 <body>
@@ -374,7 +387,7 @@ body {
         <div class="kpi-card" id="kpi-prom-dest"><div class="kpi-label">Prom. Destetados</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Promedio Destetados por Camada</div><div class="tt-desc">Media de lechones destetados por cerda. Refleja supervivencia en maternidad.</div><div class="tt-calc">Calculo: Total lechones destetados ÷ Total camadas destetadas</div><div class="tt-ref">Ref: Excelente: >13 | Bueno: 11.5-13 | Alerta: <11</div></div></div>
         <div class="kpi-card" id="kpi-peso-dest"><div class="kpi-label">Peso Destete (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso al Destete</div><div class="tt-desc">Peso promedio del lechón al momento del destete. Impacta el rendimiento posterior.</div><div class="tt-calc">Calculo: Suma pesos al destete ÷ Total destetados</div><div class="tt-ref">Ref: Excelente: >7kg | Bueno: 6-7kg | Bajo: <6kg (a 21 días)</div></div></div>
         <div class="kpi-card" id="kpi-dias-lact"><div class="kpi-label">Dias Lactancia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Días de Lactancia</div><div class="tt-desc">Duración promedio de la lactancia desde parto hasta destete.</div><div class="tt-calc">Calculo: Promedio de (Fecha destete - Fecha parto)</div><div class="tt-ref">Ref: Estándar: 21-28 días según sistema</div></div></div>
-        <div class="kpi-card" id="kpi-gpd-lech"><div class="kpi-label">GPD Lechones</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">GPD Lechones en Lactancia</div><div class="tt-desc">Ganancia de peso diaria del lechón durante la lactancia.</div><div class="tt-calc">Calculo: (Peso destete - Peso nacimiento) ÷ Días de lactancia</div><div class="tt-ref">Ref: Bueno: >0.23 kg/d | Excelente: >0.27 kg/d</div></div></div>
+        <div class="kpi-card" id="kpi-gpd-lech"><div class="kpi-label">GPD Lechones</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">GPD Lechones en Lactancia</div><div class="tt-desc">Ganancia de peso diaria del lechón durante la lactancia.</div><div class="tt-calc">Calculo: (Peso destete - Peso nacimiento) ÷ Días de lactancia</div><div class="tt-ref">Ref: Bueno: >0.23 kg/d | Excelente: >0.27 kg/d</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -390,9 +403,9 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Mortalidad</div>
       <div class="kpi-grid" id="kpi-mortalidad">
-        <div class="kpi-card" id="kpi-mort-pd"><div class="kpi-label">Mort. Pre-Destete (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete (%)</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que no sobreviven hasta el destete.</div><div class="tt-calc">Calculo: ((Nacidos vivos - Destetados) ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
-        <div class="kpi-card" id="kpi-mort-eng"><div class="kpi-label">Mort. Engorde (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Engorde (%)</div><div class="tt-desc">Porcentaje de bajas en la etapa de crecimiento-terminación.</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
-        <div class="kpi-card" id="kpi-mort-hem"><div class="kpi-label">Mort. Hembras (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Hembras (%)</div><div class="tt-desc">Porcentaje de hembras reproductoras que mueren (no incluye descartes planificados).</div><div class="tt-calc">Calculo: (Hembras muertas ÷ Stock promedio) × 100 anualizado</div><div class="tt-ref">Ref: Aceptable: <6% anual | Alerta: >8% anual</div></div></div>
+        <div class="kpi-card" id="kpi-mort-pd"><div class="kpi-label">Mort. Pre-Destete (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete (%)</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que no sobreviven hasta el destete.</div><div class="tt-calc">Calculo: ((Nacidos vivos - Destetados) ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
+        <div class="kpi-card" id="kpi-mort-eng"><div class="kpi-label">Mort. Engorde (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Engorde (%)</div><div class="tt-desc">Porcentaje de bajas en la etapa de crecimiento-terminación.</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
+        <div class="kpi-card" id="kpi-mort-hem"><div class="kpi-label">Mort. Hembras (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Hembras (%)</div><div class="tt-desc">Porcentaje de hembras reproductoras que mueren (no incluye descartes planificados).</div><div class="tt-calc">Calculo: (Hembras muertas ÷ Stock promedio) × 100 anualizado</div><div class="tt-ref">Ref: Aceptable: <6% anual | Alerta: >8% anual</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -409,12 +422,12 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Engorde</div>
       <div class="kpi-grid" id="kpi-engorde">
-        <div class="kpi-card" id="kpi-gdp-e"><div class="kpi-label">GDP (kg/dia)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">GDP Engorde (kg/día)</div><div class="tt-desc">Ganancia diaria de peso en la fase de engorde (recría + terminación).</div><div class="tt-calc">Calculo: (Peso salida - Peso entrada) ÷ Días en engorde</div><div class="tt-ref">Ref: Excelente: >0.85 kg/d | Bueno: 0.75-0.85</div></div></div>
-        <div class="kpi-card" id="kpi-conv-e"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia Engorde</div><div class="tt-desc">Eficiencia de conversión de alimento en carne durante engorde.</div><div class="tt-calc">Calculo: kg alimento consumido ÷ kg ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
-        <div class="kpi-card" id="kpi-peso-ent"><div class="kpi-label">Peso Entrada (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Entrada a Engorde</div><div class="tt-desc">Peso promedio del lechón al ingresar a la etapa de engorde (post-destete/recría).</div><div class="tt-calc">Calculo: Suma pesos de entrada ÷ Total ingresados</div><div class="tt-ref">Ref: Típico: 22-28 kg dependiendo del sistema</div></div></div>
-        <div class="kpi-card" id="kpi-peso-sal-e"><div class="kpi-label">Peso Salida (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Salida Engorde</div><div class="tt-desc">Peso promedio al finalizar engorde, antes de envío a faena.</div><div class="tt-calc">Calculo: Suma pesos de salida ÷ Total salidos</div><div class="tt-ref">Ref: Objetivo: 110-130 kg según mercado</div></div></div>
-        <div class="kpi-card" id="kpi-mort-e"><div class="kpi-label">Mortalidad (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad General (%)</div><div class="tt-desc">Tasa de mortalidad total en la etapa de engorde.</div><div class="tt-calc">Calculo: (Muertes ÷ Inventario inicial + Ingresos) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5%</div></div></div>
-        <div class="kpi-card" id="kpi-tot-sal"><div class="kpi-label">Total Salidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total Salidas</div><div class="tt-desc">Cantidad de cerdos que salieron de engorde en el período (ventas, faena, traslados).</div><div class="tt-calc">Calculo: Conteo de eventos de salida registrados.</div><div class="tt-ref">Ref: Relacionar con ingresos de ~150-170 días antes</div></div></div>
+        <div class="kpi-card" id="kpi-gdp-e"><div class="kpi-label">GDP (kg/dia)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">GDP Engorde (kg/día)</div><div class="tt-desc">Ganancia diaria de peso en la fase de engorde (recría + terminación).</div><div class="tt-calc">Calculo: (Peso salida - Peso entrada) ÷ Días en engorde</div><div class="tt-ref">Ref: Excelente: >0.85 kg/d | Bueno: 0.75-0.85</div></div></div>
+        <div class="kpi-card" id="kpi-conv-e"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia Engorde</div><div class="tt-desc">Eficiencia de conversión de alimento en carne durante engorde.</div><div class="tt-calc">Calculo: kg alimento consumido ÷ kg ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
+        <div class="kpi-card" id="kpi-peso-ent"><div class="kpi-label">Peso Entrada (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Entrada a Engorde</div><div class="tt-desc">Peso promedio del lechón al ingresar a la etapa de engorde (post-destete/recría).</div><div class="tt-calc">Calculo: Suma pesos de entrada ÷ Total ingresados</div><div class="tt-ref">Ref: Típico: 22-28 kg dependiendo del sistema</div></div></div>
+        <div class="kpi-card" id="kpi-peso-sal-e"><div class="kpi-label">Peso Salida (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Salida Engorde</div><div class="tt-desc">Peso promedio al finalizar engorde, antes de envío a faena.</div><div class="tt-calc">Calculo: Suma pesos de salida ÷ Total salidos</div><div class="tt-ref">Ref: Objetivo: 110-130 kg según mercado</div></div></div>
+        <div class="kpi-card" id="kpi-mort-e"><div class="kpi-label">Mortalidad (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad General (%)</div><div class="tt-desc">Tasa de mortalidad total en la etapa de engorde.</div><div class="tt-calc">Calculo: (Muertes ÷ Inventario inicial + Ingresos) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5%</div></div></div>
+        <div class="kpi-card" id="kpi-tot-sal"><div class="kpi-label">Total Salidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Total Salidas</div><div class="tt-desc">Cantidad de cerdos que salieron de engorde en el período (ventas, faena, traslados).</div><div class="tt-calc">Calculo: Conteo de eventos de salida registrados.</div><div class="tt-ref">Ref: Relacionar con ingresos de ~150-170 días antes</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -629,6 +642,39 @@ body {
     } else {
       benchEl.innerHTML = '';
     }
+  }
+
+  function setKpiCurrent(id, currentVal, sixMonthVal, higherIsGood, unit) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    let curEl = card.querySelector('.kpi-current');
+    if (!curEl) {
+      curEl = document.createElement('div');
+      curEl.className = 'kpi-current';
+      const benchEl = card.querySelector('.kpi-bench');
+      if (benchEl) benchEl.after(curEl);
+      else card.appendChild(curEl);
+    }
+    const mNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const mLabel = mNames[new Date().getMonth()];
+    if (currentVal == null || currentVal === '--') {
+      curEl.innerHTML = '<span class="cur-label">' + mLabel + ':</span> <span class="cur-val">--</span>';
+      return;
+    }
+    let deltaHtml = '';
+    if (sixMonthVal != null && !isNaN(sixMonthVal) && sixMonthVal !== 0) {
+      const numCur = parseFloat(String(currentVal).replace(/\./g, '').replace(',', '.'));
+      if (!isNaN(numCur)) {
+        const diff = numCur - sixMonthVal;
+        const pct = (diff / Math.abs(sixMonthVal)) * 100;
+        const isUp = diff >= 0;
+        const isGood = higherIsGood ? isUp : !isUp;
+        const arrow = isUp ? String.fromCharCode(8593) : String.fromCharCode(8595);
+        const cls = (isUp ? 'up' : 'down') + '-' + (isGood ? 'good' : 'bad');
+        deltaHtml = ' <span class="cur-delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '% vs 6M</span>';
+      }
+    }
+    curEl.innerHTML = '<span class="cur-label">' + mLabel + ':</span> <span class="cur-val">' + currentVal + (unit || '') + '</span>' + deltaHtml;
   }
 
   function setKpiError(id, msg) {
@@ -885,15 +931,19 @@ out.push({ month: period, value: k.value });
   async function loadResumen() {
     const start = monthStart(-5);
     const end = today();
+    const curStart = monthStart(0);
+    const curEnd = today();
     const kpiCodes1 = [
       'ACTIVE_SOWS_INVENTORY','PIGS_WEANED_MATED_FEMALE_YEAR','FARROWING_RATE',
       'AVERAGE_BORN_ALIVE','RATE_WEANING_PIG_DEATHS','AVERAGE_NON_PRODUCTIVE_DAYS'
     ];
 
-    // Sitio 1 KPIs
+    // Sitio 1 KPIs (6 meses)
+    let sixM1 = {};
     try {
       const data = await fetchKpis('sitio1', kpiCodes1, start, end, 'farm_id');
       const v = (code) => extractKpiValue(data, code);
+      kpiCodes1.forEach(c => { sixM1[c] = v(c); });
       setKpi('kpi-stock', fmtInt(v('ACTIVE_SOWS_INVENTORY')), null, null, true);
       setKpi('kpi-psy', fmtNum(v('PIGS_WEANED_MATED_FEMALE_YEAR'), 2), BENCHMARKS.PSY, 'Bench', true);
       setKpi('kpi-tp', fmtPct(v('FARROWING_RATE')), BENCHMARKS.FARROWING_RATE, 'Bench', true, '%');
@@ -904,17 +954,45 @@ out.push({ month: period, value: k.value });
       ['kpi-stock','kpi-psy','kpi-tp','kpi-nv','kpi-mpd','kpi-dnp'].forEach(id => setKpiError(id, e.message));
     }
 
-    // Engorde KPIs
+    // Sitio 1 - Mes actual (comparativa)
     try {
-      const kpiCodes3 = ['DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE'];
+      const curData = await fetchKpis('sitio1', kpiCodes1, curStart, curEnd, 'farm_id');
+      const cv = (code) => extractKpiValue(curData, code);
+      setKpiCurrent('kpi-stock', fmtInt(cv('ACTIVE_SOWS_INVENTORY')), sixM1['ACTIVE_SOWS_INVENTORY'], true);
+      setKpiCurrent('kpi-psy', fmtNum(cv('PIGS_WEANED_MATED_FEMALE_YEAR'), 2), sixM1['PIGS_WEANED_MATED_FEMALE_YEAR'], true);
+      setKpiCurrent('kpi-tp', fmtPct(cv('FARROWING_RATE')), sixM1['FARROWING_RATE'], true, '%');
+      setKpiCurrent('kpi-nv', fmtNum(cv('AVERAGE_BORN_ALIVE'), 1), sixM1['AVERAGE_BORN_ALIVE'], true);
+      setKpiCurrent('kpi-mpd', fmtPct(cv('RATE_WEANING_PIG_DEATHS')), sixM1['RATE_WEANING_PIG_DEATHS'], false, '%');
+      setKpiCurrent('kpi-dnp', fmtNum(cv('AVERAGE_NON_PRODUCTIVE_DAYS'), 0), sixM1['AVERAGE_NON_PRODUCTIVE_DAYS'], false);
+    } catch (e) {
+      console.error('Current month S1 error:', e);
+    }
+
+    // Engorde KPIs (6 meses)
+    let sixM3 = {};
+    const kpiCodes3 = ['DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE'];
+    try {
       const data3 = await fetchKpis('sitio3', kpiCodes3, start, end, 'farm_id');
       const v3 = (code) => extractKpiValue(data3, code);
+      kpiCodes3.forEach(c => { sixM3[c] = v3(c); });
       setKpi('kpi-gdp-r', fmtNum(v3('DAILY_WEIGHT_GAIN_STAGE'), 3), BENCHMARKS.GDP, 'Bench', true, ' kg');
       setKpi('kpi-conv-r', fmtNum(v3('FEED_CONVERSION_RATIO_STAGE'), 2), BENCHMARKS.FEED_CONV, 'Bench', false);
       setKpi('kpi-mort-eng-r', fmtPct(v3('RATE_MORTALITY_INPLACE_STAGE')), 3, 'Bench', false, '%');
       setKpi('kpi-peso-sal-r', fmtNum(v3('WAVERAGE_WEIGHT_OUTPUT_STAGE'), 1) + ' kg', BENCHMARKS.SLAUGHTER_WT, 'Bench', true, ' kg');
     } catch (e) {
       ['kpi-gdp-r','kpi-conv-r','kpi-mort-eng-r','kpi-peso-sal-r'].forEach(id => setKpiError(id, e.message));
+    }
+
+    // Engorde - Mes actual (comparativa)
+    try {
+      const curData3 = await fetchKpis('sitio3', kpiCodes3, curStart, curEnd, 'farm_id');
+      const cv3 = (code) => extractKpiValue(curData3, code);
+      setKpiCurrent('kpi-gdp-r', fmtNum(cv3('DAILY_WEIGHT_GAIN_STAGE'), 3), sixM3['DAILY_WEIGHT_GAIN_STAGE'], true, ' kg');
+      setKpiCurrent('kpi-conv-r', fmtNum(cv3('FEED_CONVERSION_RATIO_STAGE'), 2), sixM3['FEED_CONVERSION_RATIO_STAGE'], false);
+      setKpiCurrent('kpi-mort-eng-r', fmtPct(cv3('RATE_MORTALITY_INPLACE_STAGE')), sixM3['RATE_MORTALITY_INPLACE_STAGE'], false, '%');
+      setKpiCurrent('kpi-peso-sal-r', fmtNum(cv3('WAVERAGE_WEIGHT_OUTPUT_STAGE'), 1) + ' kg', sixM3['WAVERAGE_WEIGHT_OUTPUT_STAGE'], true, ' kg');
+    } catch (e) {
+      console.error('Current month S3 error:', e);
     }
 
     // PSY trend chart
