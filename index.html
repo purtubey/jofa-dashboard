@@ -253,6 +253,21 @@ body {
 
 /* MULTI CHART GRID */
 .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Tooltips informativos */
+    .kpi-card { position: relative; cursor: help; }
+    .kpi-tooltip {
+      display: none; position: absolute; bottom: calc(100% + 10px); left: 50%;
+      transform: translateX(-50%); width: 280px; padding: 14px 16px;
+      background: var(--bg-1); border: 1px solid var(--bg-4); border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 100; text-align: left;
+      pointer-events: none;
+    }
+    .kpi-card:hover .kpi-tooltip { display: block; }
+    .kpi-tooltip .tt-title { font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: 6px; }
+    .kpi-tooltip .tt-desc { font-size: 12px; color: var(--text-1); line-height: 1.5; margin-bottom: 8px; }
+    .kpi-tooltip .tt-calc { font-size: 11px; color: var(--text-2); border-top: 1px solid var(--bg-3); padding-top: 6px; margin-bottom: 4px; }
+    .kpi-tooltip .tt-ref { font-size: 11px; color: var(--green); }
 </style>
 </head>
 <body>
@@ -286,21 +301,21 @@ body {
     <div class="section">
       <div class="section-title">Indicadores Productivos - Sitio 1</div>
       <div class="kpi-grid" id="kpi-resumen-prod">
-        <div class="kpi-card" id="kpi-stock"><div class="kpi-label">Stock Madres</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-psy"><div class="kpi-label">PSY</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-tp"><div class="kpi-label">Tasa Paricion</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-nv"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-mpd"><div class="kpi-label">Mort. Pre-Destete</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-dnp"><div class="kpi-label">Dias No Productivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-stock"><div class="kpi-label">Stock Madres</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Stock de Madres Activas</div><div class="tt-desc">Cantidad de hembras reproductoras activas en el plantel (preñadas, lactando, vacías en servicio).</div><div class="tt-calc">Calculo: Conteo de hembras con estado activo en el sistema.</div><div class="tt-ref">Ref: Objetivo JOFA: 900 madres</div></div></div>
+        <div class="kpi-card" id="kpi-psy"><div class="kpi-label">PSY</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">PSY — Destetados/Hembra/Año</div><div class="tt-desc">Cerdos destetados por hembra en inventario por año. Es EL indicador clave de productividad de la granja.</div><div class="tt-calc">Calculo: (Total destetados ÷ Hembras promedio) × (365 ÷ días del período)</div><div class="tt-ref">Ref: Top 10%: >30 | Buen nivel: 27-30 | Promedio: 24-27</div></div></div>
+        <div class="kpi-card" id="kpi-tp"><div class="kpi-label">Tasa Paricion</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Tasa de Parición</div><div class="tt-desc">Porcentaje de hembras servidas que efectivamente paren. Refleja fertilidad y manejo reproductivo.</div><div class="tt-calc">Calculo: (Partos ÷ Servicios del período correspondiente) × 100</div><div class="tt-ref">Ref: Excelente: >92% | Bueno: 88-92% | Alerta: <85%</div></div></div>
+        <div class="kpi-card" id="kpi-nv"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Nacidos Vivos Promedio</div><div class="tt-desc">Promedio de lechones nacidos vivos por parto. Indicador de prolificidad genética y manejo.</div><div class="tt-calc">Calculo: Total nacidos vivos ÷ Total partos</div><div class="tt-ref">Ref: Top: >14.5 | Bueno: 13-14.5 | Promedio: 11.5-13</div></div></div>
+        <div class="kpi-card" id="kpi-mpd"><div class="kpi-label">Mort. Pre-Destete</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que mueren antes del destete. Refleja calidad de manternidad.</div><div class="tt-calc">Calculo: (Muertos en lactancia ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
+        <div class="kpi-card" id="kpi-dnp"><div class="kpi-label">Dias No Productivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Días No Productivos</div><div class="tt-desc">Días en que la hembra no está preñada ni lactando. Impactan directamente el PSY y la rentabilidad.</div><div class="tt-calc">Calculo: Días vacíos + días de repeticiones + días de descarte no productivo</div><div class="tt-ref">Ref: Excelente: <30 | Aceptable: 30-45 | Alerta: >50</div></div></div>
       </div>
     </div>
     <div class="section">
       <div class="section-title">Indicadores Engorde</div>
       <div class="kpi-grid" id="kpi-resumen-eng">
-        <div class="kpi-card" id="kpi-gdp-r"><div class="kpi-label">GDP</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-conv-r"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-mort-eng-r"><div class="kpi-label">Mortalidad Engorde</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-peso-sal-r"><div class="kpi-label">Peso Medio Salida</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-gdp-r"><div class="kpi-label">GDP</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">GDP — Ganancia Diaria de Peso</div><div class="tt-desc">Gramos de peso que gana el cerdo por día en engorde. Indicador de eficiencia productiva.</div><div class="tt-calc">Calculo: (Peso salida - Peso entrada) ÷ Días en engorde</div><div class="tt-ref">Ref: Excelente: >0.85 kg/d | Bueno: 0.75-0.85 | Alerta: <0.70</div></div></div>
+        <div class="kpi-card" id="kpi-conv-r"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia</div><div class="tt-desc">Kilos de alimento necesarios para producir 1 kg de carne. Menor es mejor.</div><div class="tt-calc">Calculo: Total alimento consumido ÷ Total ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
+        <div class="kpi-card" id="kpi-mort-eng-r"><div class="kpi-label">Mortalidad Engorde</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad en Engorde</div><div class="tt-desc">Porcentaje de cerdos que mueren durante la etapa de engorde (recría + terminación).</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados a engorde) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
+        <div class="kpi-card" id="kpi-peso-sal-r"><div class="kpi-label">Peso Medio Salida</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Salida</div><div class="tt-desc">Peso promedio al que se venden los cerdos terminados. Afecta el ingreso por cerdo.</div><div class="tt-calc">Calculo: Suma de pesos de salida ÷ Total cerdos vendidos</div><div class="tt-ref">Ref: Objetivo típico: 110-130 kg según mercado</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -316,10 +331,10 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Servicio</div>
       <div class="kpi-grid" id="kpi-servicio">
-        <div class="kpi-card" id="kpi-tot-serv"><div class="kpi-label">Total Servicios</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-idc"><div class="kpi-label">IDC (Dest-Cubricion)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-s7d"><div class="kpi-label">% Serv. menos 7 dias</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-rep"><div class="kpi-label">Repeticion Celo</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-tot-serv"><div class="kpi-label">Total Servicios</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total Servicios (Cubriciones)</div><div class="tt-desc">Cantidad de servicios/inseminaciones realizados en el período seleccionado.</div><div class="tt-calc">Calculo: Conteo de eventos de servicio registrados.</div><div class="tt-ref">Ref: Depende del tamaño de plantel y tasa de reposición</div></div></div>
+        <div class="kpi-card" id="kpi-idc"><div class="kpi-label">IDC (Dest-Cubricion)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">IDC — Intervalo Destete-Cubrición</div><div class="tt-desc">Días promedio desde el destete hasta la siguiente inseminación. Menor = más eficiente.</div><div class="tt-calc">Calculo: Promedio de (Fecha servicio - Fecha destete) para hembras servidas.</div><div class="tt-ref">Ref: Excelente: <5 días | Bueno: 5-7 | Alerta: >7</div></div></div>
+        <div class="kpi-card" id="kpi-s7d"><div class="kpi-label">% Serv. menos 7 dias</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">% Servidas antes de 7 días</div><div class="tt-desc">Porcentaje de hembras que fueron servidas dentro de los 7 días post-destete.</div><div class="tt-calc">Calculo: (Hembras servidas ≤7d post-destete ÷ Total destetadas) × 100</div><div class="tt-ref">Ref: Objetivo: >90%</div></div></div>
+        <div class="kpi-card" id="kpi-rep"><div class="kpi-label">Repeticion Celo</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Tasa de Repetición de Celo</div><div class="tt-desc">Porcentaje de hembras servidas que repiten celo (no quedan preñadas al primer servicio).</div><div class="tt-calc">Calculo: (Repeticiones ÷ Total servicios) × 100</div><div class="tt-ref">Ref: Excelente: <5% | Aceptable: 5-10% | Alerta: >10%</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -335,11 +350,11 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Maternidad</div>
       <div class="kpi-grid" id="kpi-maternidad">
-        <div class="kpi-card" id="kpi-tot-par"><div class="kpi-label">Total Partos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-nv-prom"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-nt"><div class="kpi-label">Total Nacidos Vivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-mom"><div class="kpi-label">Momificados</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-mn"><div class="kpi-label">Nacidos Muertos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-tot-par"><div class="kpi-label">Total Partos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total Partos</div><div class="tt-desc">Cantidad de partos registrados en el período. Base para el cálculo de productividad.</div><div class="tt-calc">Calculo: Conteo de eventos de parto.</div><div class="tt-ref">Ref: Relacionar con servicios de ~114 días antes</div></div></div>
+        <div class="kpi-card" id="kpi-nv-prom"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Nacidos Vivos Promedio</div><div class="tt-desc">Media de lechones nacidos vivos por parto en el período.</div><div class="tt-calc">Calculo: Total nacidos vivos ÷ Total partos</div><div class="tt-ref">Ref: Top: >14.5 | Bueno: 13-14.5 | Promedio: 11.5-13</div></div></div>
+        <div class="kpi-card" id="kpi-nt"><div class="kpi-label">Total Nacidos Vivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total Nacidos Vivos</div><div class="tt-desc">Suma total de lechones nacidos vivos en todos los partos del período.</div><div class="tt-calc">Calculo: Suma acumulada de nacidos vivos.</div><div class="tt-ref">Ref: Derivado de partos × prolificidad</div></div></div>
+        <div class="kpi-card" id="kpi-mom"><div class="kpi-label">Momificados</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Momificados</div><div class="tt-desc">Lechones momificados por parto. Indica muertes fetales tardías (último tercio de gestación).</div><div class="tt-calc">Calculo: Total momificados ÷ Total partos</div><div class="tt-ref">Ref: Aceptable: <2% | Alerta: >3% del total nacidos</div></div></div>
+        <div class="kpi-card" id="kpi-mn"><div class="kpi-label">Nacidos Muertos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Nacidos Muertos (Mortinatos)</div><div class="tt-desc">Lechones que nacen muertos. Puede indicar problemas de parto, genéticos o infecciosos.</div><div class="tt-calc">Calculo: Total nacidos muertos ÷ Total partos</div><div class="tt-ref">Ref: Aceptable: <7% | Alerta: >10% de total nacidos</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -355,11 +370,11 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Destete</div>
       <div class="kpi-grid" id="kpi-destete">
-        <div class="kpi-card" id="kpi-tot-dest"><div class="kpi-label">Total Destetes</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-prom-dest"><div class="kpi-label">Prom. Destetados</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-peso-dest"><div class="kpi-label">Peso Destete (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-dias-lact"><div class="kpi-label">Dias Lactancia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-gpd-lech"><div class="kpi-label">GPD Lechones</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-tot-dest"><div class="kpi-label">Total Destetes</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total Destetes</div><div class="tt-desc">Cantidad de camadas destetadas en el período.</div><div class="tt-calc">Calculo: Conteo de eventos de destete.</div><div class="tt-ref">Ref: Correlacionar con partos de ~21 días antes</div></div></div>
+        <div class="kpi-card" id="kpi-prom-dest"><div class="kpi-label">Prom. Destetados</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Promedio Destetados por Camada</div><div class="tt-desc">Media de lechones destetados por cerda. Refleja supervivencia en maternidad.</div><div class="tt-calc">Calculo: Total lechones destetados ÷ Total camadas destetadas</div><div class="tt-ref">Ref: Excelente: >13 | Bueno: 11.5-13 | Alerta: <11</div></div></div>
+        <div class="kpi-card" id="kpi-peso-dest"><div class="kpi-label">Peso Destete (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso al Destete</div><div class="tt-desc">Peso promedio del lechón al momento del destete. Impacta el rendimiento posterior.</div><div class="tt-calc">Calculo: Suma pesos al destete ÷ Total destetados</div><div class="tt-ref">Ref: Excelente: >7kg | Bueno: 6-7kg | Bajo: <6kg (a 21 días)</div></div></div>
+        <div class="kpi-card" id="kpi-dias-lact"><div class="kpi-label">Dias Lactancia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Días de Lactancia</div><div class="tt-desc">Duración promedio de la lactancia desde parto hasta destete.</div><div class="tt-calc">Calculo: Promedio de (Fecha destete - Fecha parto)</div><div class="tt-ref">Ref: Estándar: 21-28 días según sistema</div></div></div>
+        <div class="kpi-card" id="kpi-gpd-lech"><div class="kpi-label">GPD Lechones</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">GPD Lechones en Lactancia</div><div class="tt-desc">Ganancia de peso diaria del lechón durante la lactancia.</div><div class="tt-calc">Calculo: (Peso destete - Peso nacimiento) ÷ Días de lactancia</div><div class="tt-ref">Ref: Bueno: >0.23 kg/d | Excelente: >0.27 kg/d</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -375,9 +390,9 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Mortalidad</div>
       <div class="kpi-grid" id="kpi-mortalidad">
-        <div class="kpi-card" id="kpi-mort-pd"><div class="kpi-label">Mort. Pre-Destete (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-mort-eng"><div class="kpi-label">Mort. Engorde (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-mort-hem"><div class="kpi-label">Mort. Hembras (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-mort-pd"><div class="kpi-label">Mort. Pre-Destete (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete (%)</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que no sobreviven hasta el destete.</div><div class="tt-calc">Calculo: ((Nacidos vivos - Destetados) ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
+        <div class="kpi-card" id="kpi-mort-eng"><div class="kpi-label">Mort. Engorde (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Engorde (%)</div><div class="tt-desc">Porcentaje de bajas en la etapa de crecimiento-terminación.</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
+        <div class="kpi-card" id="kpi-mort-hem"><div class="kpi-label">Mort. Hembras (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Hembras (%)</div><div class="tt-desc">Porcentaje de hembras reproductoras que mueren (no incluye descartes planificados).</div><div class="tt-calc">Calculo: (Hembras muertas ÷ Stock promedio) × 100 anualizado</div><div class="tt-ref">Ref: Aceptable: <6% anual | Alerta: >8% anual</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -394,12 +409,12 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Engorde</div>
       <div class="kpi-grid" id="kpi-engorde">
-        <div class="kpi-card" id="kpi-gdp-e"><div class="kpi-label">GDP (kg/dia)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-conv-e"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-peso-ent"><div class="kpi-label">Peso Entrada (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-peso-sal-e"><div class="kpi-label">Peso Salida (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-mort-e"><div class="kpi-label">Mortalidad (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
-        <div class="kpi-card" id="kpi-tot-sal"><div class="kpi-label">Total Salidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div></div>
+        <div class="kpi-card" id="kpi-gdp-e"><div class="kpi-label">GDP (kg/dia)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">GDP Engorde (kg/día)</div><div class="tt-desc">Ganancia diaria de peso en la fase de engorde (recría + terminación).</div><div class="tt-calc">Calculo: (Peso salida - Peso entrada) ÷ Días en engorde</div><div class="tt-ref">Ref: Excelente: >0.85 kg/d | Bueno: 0.75-0.85</div></div></div>
+        <div class="kpi-card" id="kpi-conv-e"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia Engorde</div><div class="tt-desc">Eficiencia de conversión de alimento en carne durante engorde.</div><div class="tt-calc">Calculo: kg alimento consumido ÷ kg ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
+        <div class="kpi-card" id="kpi-peso-ent"><div class="kpi-label">Peso Entrada (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Entrada a Engorde</div><div class="tt-desc">Peso promedio del lechón al ingresar a la etapa de engorde (post-destete/recría).</div><div class="tt-calc">Calculo: Suma pesos de entrada ÷ Total ingresados</div><div class="tt-ref">Ref: Típico: 22-28 kg dependiendo del sistema</div></div></div>
+        <div class="kpi-card" id="kpi-peso-sal-e"><div class="kpi-label">Peso Salida (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Salida Engorde</div><div class="tt-desc">Peso promedio al finalizar engorde, antes de envío a faena.</div><div class="tt-calc">Calculo: Suma pesos de salida ÷ Total salidos</div><div class="tt-ref">Ref: Objetivo: 110-130 kg según mercado</div></div></div>
+        <div class="kpi-card" id="kpi-mort-e"><div class="kpi-label">Mortalidad (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad General (%)</div><div class="tt-desc">Tasa de mortalidad total en la etapa de engorde.</div><div class="tt-calc">Calculo: (Muertes ÷ Inventario inicial + Ingresos) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5%</div></div></div>
+        <div class="kpi-card" id="kpi-tot-sal"><div class="kpi-label">Total Salidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total Salidas</div><div class="tt-desc">Cantidad de cerdos que salieron de engorde en el período (ventas, faena, traslados).</div><div class="tt-calc">Calculo: Conteo de eventos de salida registrados.</div><div class="tt-ref">Ref: Relacionar con ingresos de ~150-170 días antes</div></div></div>
       </div>
     </div>
     <div class="section">
