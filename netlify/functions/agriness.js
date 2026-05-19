@@ -257,6 +257,45 @@ exports.handler = async (event) => {
 
     console.log('API response for', action, ':', result.status, JSON.stringify(result.data).substring(0, 200));
 
+    // Retry con token refresh si 403 en KPI endpoints
+    if (result.status === 403 && isKpiAction) {
+      console.log('403 on KPI endpoint, clearing cached tokens and retrying...');
+      kpiToken = null;
+      kpiTokenExpiry = 0;
+      wso2Token = null;
+      wso2TokenExpiry = 0;
+      try {
+        const freshKpiToken = await getKpiToken();
+        const freshKpiHeaders = { 'Content-Type': 'application/json' };
+        if (WSO2_API_KEY) {
+          freshKpiHeaders['apikey'] = WSO2_API_KEY;
+        } else {
+          const freshGw = await getWso2Token();
+          freshKpiHeaders['Authorization'] = 'Bearer ' + freshGw;
+        }
+        freshKpiHeaders['HTTP-AUTHORIZATION'] = freshKpiToken;
+        console.log('Retrying', action, 'with fresh KPI token, length:', freshKpiToken.length);
+
+        const kpiPaths = {
+          'kpis_sitio1': '/swinekpisdefault/v1/swine/reproductive/kpis',
+          'kpis_sitio2': '/swinekpisdefault/v1/swine/nursery/kpis',
+          'kpis_sitio3': '/swinekpisdefault/v1/swine/finishing/kpis',
+          'kpis_weantofinish': '/swinekpisdefault/v1/swine/weantofinish/kpis',
+        };
+        const retryResult = await makeRequest('POST', kpiPaths[action], params, freshKpiHeaders);
+        console.log('Retry response for', action, ':', retryResult.status, JSON.stringify(retryResult.data).substring(0, 200));
+        if (retryResult.status !== 403) {
+          return {
+            statusCode: retryResult.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(retryResult.data),
+          };
+        }
+      } catch (retryErr) {
+        console.error('Retry failed:', retryErr.message);
+      }
+    }
+
     return {
       statusCode: result.status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
