@@ -1531,18 +1531,17 @@ out.push({ month: period, value: k.value });
     const TARGET_WEIGHT = 115;
 
     try {
-      // 1) Monthly peso de salida trend (6 months)
+      // 1) Monthly data (6 months) - only KPIs we know work
       const months = last6Months();
       const pesoMonthly = [];
-      const gdpMonthly = [];
+      const monthlyKpis = ['WAVERAGE_WEIGHT_OUTPUT_STAGE','DAILY_WEIGHT_GAIN_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_ANIMAL_INPUT_STAGE','RATE_MORTALITY_INPLACE_STAGE','FEED_CONVERSION_RATIO_STAGE'];
       for (const m of months) {
         try {
-          const md = await fetchKpis('sitio3', ['WAVERAGE_WEIGHT_OUTPUT_STAGE','DAILY_WEIGHT_GAIN_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE'], m.start, m.end, 'farm_id');
-          pesoMonthly.push({ month: m.start, label: monthLabel(m.start), value: extractKpiValue(md, 'WAVERAGE_WEIGHT_OUTPUT_STAGE'), cabezas: extractKpiValue(md, 'TOTAL_ANIMAL_OUTPUT_STAGE') });
-          gdpMonthly.push({ month: m.start, label: monthLabel(m.start), value: extractKpiValue(md, 'DAILY_WEIGHT_GAIN_STAGE') });
+          const md = await fetchKpis('sitio3', monthlyKpis, m.start, m.end, 'farm_id');
+          const ev = (c) => extractKpiValue(md, c);
+          pesoMonthly.push({ month: m.start, label: monthLabel(m.start), value: ev('WAVERAGE_WEIGHT_OUTPUT_STAGE'), cabezas: ev('TOTAL_ANIMAL_OUTPUT_STAGE'), gdp: ev('DAILY_WEIGHT_GAIN_STAGE'), cabIn: ev('TOTAL_ANIMAL_INPUT_STAGE'), mort: ev('RATE_MORTALITY_INPLACE_STAGE'), conv: ev('FEED_CONVERSION_RATIO_STAGE') });
         } catch (_) {
-          pesoMonthly.push({ month: m.start, label: monthLabel(m.start), value: null, cabezas: null });
-          gdpMonthly.push({ month: m.start, label: monthLabel(m.start), value: null });
+          pesoMonthly.push({ month: m.start, label: monthLabel(m.start), value: null, cabezas: null, gdp: null, cabIn: null, mort: null, conv: null });
         }
       }
 
@@ -1571,84 +1570,73 @@ out.push({ month: period, value: k.value });
       if (!pesoListHtml) pesoListHtml = '<div style="color:var(--text-3);font-size:13px;">Sin datos mensuales</div>';
       document.getElementById('engorde-peso-monthly').innerHTML = pesoListHtml;
 
-      // 2) Aggregate KPIs for the period
-      const aggKpis = [
-        'WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE',
-        'DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE',
-        'RATE_MORTALITY_INPLACE_STAGE',
-        'TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_ANIMAL_INPUT_STAGE',
-        'TOTAL_ANIMAL_DEAD_STAGE','AVERAGE_DAYS_STAGE',
-        'AVERAGE_AGE_OUTPUT_STAGE','TOTAL_WEIGHT_OUTPUT_STAGE'
-      ];
-      const aggData = await fetchKpis('sitio3', aggKpis, start, end, 'farm_id');
-      const v = (code) => extractKpiValue(aggData, code);
-
-      const pesoEntrada = v('WAVERAGE_WEIGHT_INPUT_STAGE');
-      const pesoSalida = v('WAVERAGE_WEIGHT_OUTPUT_STAGE');
-      const gdp = v('DAILY_WEIGHT_GAIN_STAGE');
-      const diasEngorde = v('AVERAGE_DAYS_STAGE');
-      const conversion = v('FEED_CONVERSION_RATIO_STAGE');
-      const mortalidad = v('RATE_MORTALITY_INPLACE_STAGE');
-      const cabezasIn = v('TOTAL_ANIMAL_INPUT_STAGE');
-      const cabezasOut = v('TOTAL_ANIMAL_OUTPUT_STAGE');
-      const muertos = v('TOTAL_ANIMAL_DEAD_STAGE');
-      const kgTotales = v('TOTAL_WEIGHT_OUTPUT_STAGE');
-      const edadSalida = v('AVERAGE_AGE_OUTPUT_STAGE');
+      // 2) Compute aggregates from monthly data (avoids requesting unknown KPIs)
+      const valid = pesoMonthly.filter(m => m.value != null);
+      let totalCabOut = 0, totalCabIn = 0, weightedPeso = 0, weightedGdp = 0, totalCabGdp = 0;
+      let lastMort = null, lastConv = null, totalKgMesa = 0;
+      valid.forEach(m => {
+        const co = num(m.cabezas);
+        const ci = num(m.cabIn);
+        const ps = num(m.value);
+        const gd = num(m.gdp);
+        totalCabOut += co;
+        totalCabIn += ci;
+        weightedPeso += ps * co;
+        if (gd > 0) { weightedGdp += gd * co; totalCabGdp += co; }
+        if (m.mort != null) lastMort = m.mort;
+        if (m.conv != null) lastConv = m.conv;
+        const def = TARGET_WEIGHT - ps;
+        if (def > 0) totalKgMesa += def * co;
+      });
+      const avgPeso = totalCabOut > 0 ? weightedPeso / totalCabOut : 0;
+      const avgGdp = totalCabGdp > 0 ? weightedGdp / totalCabGdp : 0;
+      const estKgTotales = Math.round(weightedPeso);
 
       // --- JOURNEY ---
-      const pE = num(pesoEntrada);
-      const pS = num(pesoSalida);
-      const ganancia = pS - pE;
+      const pS = avgPeso;
       const pctTarget = Math.min(100, (pS / TARGET_WEIGHT) * 100);
 
       let journeyHtml = '<div class="weight-journey">';
-      journeyHtml += '<div class="wj-labels"><span>Entrada: <strong style="color:var(--text-0)">' + fmtNum(pesoEntrada, 1) + ' kg</strong></span><span>Target: ' + TARGET_WEIGHT + ' kg</span><span>Salida: <strong style="color:' + (pS >= TARGET_WEIGHT ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(pesoSalida, 1) + ' kg</strong></span></div>';
+      journeyHtml += '<div class="wj-labels"><span>Peso promedio salida (6M)</span><span>Target: ' + TARGET_WEIGHT + ' kg</span></div>';
       journeyHtml += '<div class="wj-bar-wrap"><div class="wj-bar-fill" style="width:' + pctTarget.toFixed(0) + '%"></div></div>';
-      journeyHtml += '<div class="wj-center">Ganancia: <strong>' + fmtNum(ganancia, 1) + ' kg</strong> en <strong>' + fmtNum(diasEngorde, 0) + '</strong> dias</div>';
-      journeyHtml += '<div class="wj-center" style="margin-top:2px;">GDP: <strong style="color:' + (num(gdp) >= 0.8 ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(gdp, 3) + ' kg/dia</strong></div>';
+      journeyHtml += '<div class="wj-center" style="font-size:20px;"><strong style="color:' + (pS >= TARGET_WEIGHT ? 'var(--green)' : pS >= 100 ? 'var(--yellow)' : 'var(--red)') + '">' + fmtNum(pS, 1) + ' kg</strong></div>';
+      journeyHtml += '<div class="wj-center" style="margin-top:4px;">GDP promedio: <strong style="color:' + (avgGdp >= 0.8 ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(avgGdp, 3) + ' kg/dia</strong></div>';
       journeyHtml += '</div>';
 
-      // Kg dejados en la mesa
-      const cabOut = num(cabezasOut);
-      const deficit = TARGET_WEIGHT - pS;
-      const kgMesa = deficit > 0 ? deficit * cabOut : 0;
+      // Kg dejados en la mesa (acumulado 6 meses)
       journeyHtml += '<div class="kg-mesa">';
-      journeyHtml += '<div class="km-title">Kg dejados en la mesa</div>';
-      if (deficit > 0) {
-        journeyHtml += '<div class="km-val" style="color:var(--red);">' + fmtInt(Math.round(kgMesa)) + ' kg</div>';
-        journeyHtml += '<div class="km-detail">(' + TARGET_WEIGHT + ' - ' + fmtNum(pS, 1) + ') x ' + fmtInt(cabOut) + ' cab = ' + fmtInt(Math.round(kgMesa)) + ' kg sin facturar</div>';
+      journeyHtml += '<div class="km-title">Kg dejados en la mesa (6 meses)</div>';
+      if (totalKgMesa > 0) {
+        journeyHtml += '<div class="km-val" style="color:var(--red);">' + fmtInt(Math.round(totalKgMesa)) + ' kg</div>';
+        journeyHtml += '<div class="km-detail">Suma de (115 - peso real) x cabezas de cada mes donde el peso fue menor al target</div>';
       } else {
         journeyHtml += '<div class="km-val" style="color:var(--green);">0 kg</div>';
-        journeyHtml += '<div class="km-detail">Peso de salida cumple o supera el target de ' + TARGET_WEIGHT + ' kg</div>';
+        journeyHtml += '<div class="km-detail">Todos los meses cumplieron el target de ' + TARGET_WEIGHT + ' kg</div>';
       }
       journeyHtml += '</div>';
       document.getElementById('engorde-journey').innerHTML = journeyHtml;
 
       // --- PRODUCCION ---
       let prodHtml = '';
-      prodHtml += '<div class="flow-row"><span class="flow-label">Cabezas ingresadas</span><span class="flow-val in">+' + fmtInt(cabezasIn) + '</span></div>';
-      prodHtml += '<div class="flow-row"><span class="flow-label">Cabezas vendidas</span><span class="flow-val" style="color:var(--blue);">' + fmtInt(cabezasOut) + '</span></div>';
-      prodHtml += '<div class="flow-row"><span class="flow-label">Muertos en engorde</span><span class="flow-val out">-' + fmtInt(muertos) + '</span></div>';
-      prodHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Kg totales producidos</span><span class="flow-val" style="font-size:15px;color:var(--green);">' + fmtInt(kgTotales) + ' kg</span></div>';
+      prodHtml += '<div class="flow-row"><span class="flow-label">Cabezas ingresadas (6M)</span><span class="flow-val in">+' + fmtInt(totalCabIn) + '</span></div>';
+      prodHtml += '<div class="flow-row"><span class="flow-label">Cabezas vendidas (6M)</span><span class="flow-val" style="color:var(--blue);">' + fmtInt(totalCabOut) + '</span></div>';
+      prodHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Kg totales estimados</span><span class="flow-val" style="font-size:15px;color:var(--green);">' + fmtInt(estKgTotales) + ' kg</span></div>';
+      prodHtml += '<div class="flow-row"><span class="flow-label">Promedio mensual</span><span class="flow-val">' + fmtInt(Math.round(totalCabOut / (valid.length || 1))) + ' cab/mes</span></div>';
 
       document.getElementById('engorde-produccion').innerHTML = prodHtml;
 
       // --- EFICIENCIA ---
       let efHtml = '';
-      const gdpNum = num(gdp);
-      const convNum = num(conversion);
-      const mortNum = num(mortalidad);
+      const gdpNum = avgGdp;
+      const convNum = num(lastConv);
+      const mortNum = num(lastMort);
 
-      efHtml += '<div class="mini-kpi"><span class="mk-label">GDP (promedio)</span><span class="mk-val" style="color:' + (gdpNum >= 0.8 ? 'var(--green)' : gdpNum >= 0.7 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(gdp, 3) + ' kg/d</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">GDP promedio (6M)</span><span class="mk-val" style="color:' + (gdpNum >= 0.8 ? 'var(--green)' : gdpNum >= 0.7 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(avgGdp, 3) + ' kg/d</span></div>';
       efHtml += '<div class="mini-kpi"><span class="mk-label">Bench GDP</span><span class="mk-val" style="color:var(--text-3);">0,85 kg/d</span></div>';
-      efHtml += '<div class="mini-kpi"><span class="mk-label">Conversion Alimenticia</span><span class="mk-val" style="color:' + (convNum > 0 && convNum <= 2.5 ? 'var(--green)' : convNum <= 2.8 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(conversion, 2) + '</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">Conversion Alimenticia</span><span class="mk-val" style="color:' + (convNum > 0 && convNum <= 2.5 ? 'var(--green)' : convNum <= 2.8 ? 'var(--yellow)' : 'var(--red)') + ';">' + (lastConv != null ? fmtNum(lastConv, 2) : '--') + '</span></div>';
       efHtml += '<div class="mini-kpi"><span class="mk-label">Bench Conversion</span><span class="mk-val" style="color:var(--text-3);">2,50</span></div>';
-      efHtml += '<div class="mini-kpi"><span class="mk-label">Mortalidad Engorde</span><span class="mk-val" style="color:' + (mortNum <= 3 ? 'var(--green)' : mortNum <= 5 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtPct(mortalidad) + '</span></div>';
-      efHtml += '<div class="mini-kpi"><span class="mk-label">Dias en engorde (prom)</span><span class="mk-val">' + fmtNum(diasEngorde, 0) + ' d</span></div>';
-      if (edadSalida) {
-        efHtml += '<div class="mini-kpi"><span class="mk-label">Edad salida (prom)</span><span class="mk-val">' + fmtNum(edadSalida, 0) + ' d</span></div>';
-      }
-      efHtml += '<div class="mini-kpi" style="margin-top:8px;border-top:2px solid var(--bg-3);padding-top:8px;"><span class="mk-label" style="font-weight:600;">Peso salida vs target</span><span class="mk-val" style="color:' + (pS >= TARGET_WEIGHT ? 'var(--green)' : 'var(--red)') + ';">' + fmtNum(pesoSalida, 1) + ' / ' + TARGET_WEIGHT + ' kg</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">Mortalidad Engorde</span><span class="mk-val" style="color:' + (mortNum <= 3 ? 'var(--green)' : mortNum <= 5 ? 'var(--yellow)' : 'var(--red)') + ';">' + (lastMort != null ? fmtPct(lastMort) : '--') + '</span></div>';
+      efHtml += '<div class="mini-kpi" style="margin-top:8px;border-top:2px solid var(--bg-3);padding-top:8px;"><span class="mk-label" style="font-weight:600;">Peso salida vs target</span><span class="mk-val" style="color:' + (pS >= TARGET_WEIGHT ? 'var(--green)' : 'var(--red)') + ';">' + fmtNum(pS, 1) + ' / ' + TARGET_WEIGHT + ' kg</span></div>';
 
       document.getElementById('engorde-eficiencia').innerHTML = efHtml;
 
