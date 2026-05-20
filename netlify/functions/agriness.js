@@ -296,6 +296,40 @@ exports.handler = async (event) => {
       }
     }
 
+    // Retry con token refresh si 403 en Sitio1 event endpoints (servicios, partos, destetes)
+    const isSitio1Event = ['servicios', 'partos', 'destetes'].includes(action);
+    if (result.status === 403 && isSitio1Event) {
+      console.log('403 on sitio1 event endpoint (' + action + '), clearing S4 token and retrying...');
+      s4Token = null;
+      s4TokenExpiry = 0;
+      wso2Token = null;
+      wso2TokenExpiry = 0;
+      try {
+        const freshGw = await getWso2Token();
+        const freshS4 = await getS4Token();
+        const freshHeaders = { 'Authorization': 'Bearer ' + freshGw };
+        if (freshS4) freshHeaders['token'] = freshS4;
+        console.log('Retrying', action, 'with fresh S4 token, length:', freshS4 ? freshS4.length : 0);
+
+        const sitio1Paths = {
+          'servicios': '/sitio1-swine-default/v1/swine/reproductive/mating-list/' + ((params && params.gender) || 'female'),
+          'partos': '/sitio1-swine-default/v1/swine/reproductive/farrowing-list',
+          'destetes': '/sitio1-swine-default/v1/swine/reproductive/weaning-list',
+        };
+        const retryResult = await makeRequest('POST', sitio1Paths[action], params, freshHeaders);
+        console.log('Retry response for', action, ':', retryResult.status, JSON.stringify(retryResult.data).substring(0, 200));
+        if (retryResult.status !== 403) {
+          return {
+            statusCode: retryResult.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(retryResult.data),
+          };
+        }
+      } catch (retryErr) {
+        console.error('Sitio1 retry failed:', retryErr.message);
+      }
+    }
+
     return {
       statusCode: result.status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
