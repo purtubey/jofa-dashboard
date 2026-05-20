@@ -1546,13 +1546,16 @@ out.push({ month: period, value: k.value });
         }
       }
 
+      // Helper: safe number from raw API value (avoid destroying decimal dots)
+      function num(v) { return Number(v) || 0; }
+
       // Render monthly peso list with mini bars
       let pesoListHtml = '';
       pesoMonthly.forEach(m => {
         if (m.value == null) return;
-        const mv = parseFloat(String(m.value).replace(/\./g, '').replace(',', '.'));
-        if (isNaN(mv)) return;
-        const mc = m.cabezas ? parseFloat(String(m.cabezas).replace(/\./g, '').replace(',', '.')) : 0;
+        const mv = num(m.value);
+        if (isNaN(mv) || mv === 0) return;
+        const mc = num(m.cabezas);
         const pct = Math.min(100, (mv / (TARGET_WEIGHT * 1.1)) * 100);
         const color = mv >= TARGET_WEIGHT ? 'var(--green)' : mv >= 100 ? 'var(--yellow)' : 'var(--red)';
         const deficit = TARGET_WEIGHT - mv;
@@ -1562,7 +1565,7 @@ out.push({ month: period, value: k.value });
         pesoListHtml += '<div class="peso-month-bar"><div class="peso-month-fill" style="width:' + pct.toFixed(0) + '%;background:' + color + ';opacity:0.7;"></div></div>';
         pesoListHtml += '<span class="peso-month-val" style="color:' + color + ';">' + fmtNum(mv, 1) + ' kg</span>';
         pesoListHtml += '<span class="peso-month-cab">' + fmtInt(mc) + ' cab</span>';
-        pesoListHtml += '<span class="peso-month-deficit" style="color:' + (deficit > 0 ? 'var(--red)' : 'var(--green)') + ';">' + (deficit > 0 ? '-' + fmtInt(kgMesaMes) + ' kg' : '✓ OK') + '</span>';
+        pesoListHtml += '<span class="peso-month-deficit" style="color:' + (deficit > 0 ? 'var(--red)' : 'var(--green)') + ';">' + (deficit > 0 ? '-' + fmtInt(kgMesaMes) + ' kg' : 'OK') + '</span>';
         pesoListHtml += '</div>';
       });
       if (!pesoListHtml) pesoListHtml = '<div style="color:var(--text-3);font-size:13px;">Sin datos mensuales</div>';
@@ -1593,8 +1596,8 @@ out.push({ month: period, value: k.value });
       const edadSalida = v('AVERAGE_AGE_OUTPUT_STAGE');
 
       // --- JOURNEY ---
-      const pE = parseFloat(String(pesoEntrada || 0).replace(/\./g, '').replace(',', '.')) || 0;
-      const pS = parseFloat(String(pesoSalida || 0).replace(/\./g, '').replace(',', '.')) || 0;
+      const pE = num(pesoEntrada);
+      const pS = num(pesoSalida);
       const ganancia = pS - pE;
       const pctTarget = Math.min(100, (pS / TARGET_WEIGHT) * 100);
 
@@ -1602,11 +1605,11 @@ out.push({ month: period, value: k.value });
       journeyHtml += '<div class="wj-labels"><span>Entrada: <strong style="color:var(--text-0)">' + fmtNum(pesoEntrada, 1) + ' kg</strong></span><span>Target: ' + TARGET_WEIGHT + ' kg</span><span>Salida: <strong style="color:' + (pS >= TARGET_WEIGHT ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(pesoSalida, 1) + ' kg</strong></span></div>';
       journeyHtml += '<div class="wj-bar-wrap"><div class="wj-bar-fill" style="width:' + pctTarget.toFixed(0) + '%"></div></div>';
       journeyHtml += '<div class="wj-center">Ganancia: <strong>' + fmtNum(ganancia, 1) + ' kg</strong> en <strong>' + fmtNum(diasEngorde, 0) + '</strong> dias</div>';
-      journeyHtml += '<div class="wj-center" style="margin-top:2px;">GDP: <strong style="color:' + (parseFloat(String(gdp || 0).replace(/\./g, '').replace(',', '.')) >= 0.8 ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(gdp, 3) + ' kg/dia</strong></div>';
+      journeyHtml += '<div class="wj-center" style="margin-top:2px;">GDP: <strong style="color:' + (num(gdp) >= 0.8 ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(gdp, 3) + ' kg/dia</strong></div>';
       journeyHtml += '</div>';
 
       // Kg dejados en la mesa
-      const cabOut = parseFloat(String(cabezasOut || 0).replace(/\./g, '').replace(',', '.')) || 0;
+      const cabOut = num(cabezasOut);
       const deficit = TARGET_WEIGHT - pS;
       const kgMesa = deficit > 0 ? deficit * cabOut : 0;
       journeyHtml += '<div class="kg-mesa">';
@@ -1632,9 +1635,9 @@ out.push({ month: period, value: k.value });
 
       // --- EFICIENCIA ---
       let efHtml = '';
-      const gdpNum = parseFloat(String(gdp || 0).replace(/\./g, '').replace(',', '.'));
-      const convNum = parseFloat(String(conversion || 0).replace(/\./g, '').replace(',', '.'));
-      const mortNum = parseFloat(String(mortalidad || 0).replace(/\./g, '').replace(',', '.'));
+      const gdpNum = num(gdp);
+      const convNum = num(conversion);
+      const mortNum = num(mortalidad);
 
       efHtml += '<div class="mini-kpi"><span class="mk-label">GDP (promedio)</span><span class="mk-val" style="color:' + (gdpNum >= 0.8 ? 'var(--green)' : gdpNum >= 0.7 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(gdp, 3) + ' kg/d</span></div>';
       efHtml += '<div class="mini-kpi"><span class="mk-label">Bench GDP</span><span class="mk-val" style="color:var(--text-3);">0,85 kg/d</span></div>';
