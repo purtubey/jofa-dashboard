@@ -1644,7 +1644,7 @@ out.push({ month: period, value: k.value });
 
       document.getElementById('stock-indicators').innerHTML = indHtml;
 
-      stockPanelLoaded = true;
+      // loaded flag managed by panelLoaded map
       loading.style.display = 'none';
       content.style.display = 'grid';
     } catch (e) {
@@ -1870,7 +1870,7 @@ out.push({ month: period, value: k.value });
 
       document.getElementById('engorde-eficiencia').innerHTML = efHtml;
 
-      engordePanelLoaded = true;
+      // loaded flag managed by panelLoaded map
       loading.style.display = 'none';
       content.style.display = 'block';
     } catch (e) {
