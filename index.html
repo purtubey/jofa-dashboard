@@ -326,6 +326,47 @@ body {
     .mini-kpi .mk-val { font-weight: 600; color: var(--text-0); }
 
     .stock-loading { text-align: center; padding: 30px; color: var(--text-3); font-size: 13px; }
+
+    /* Panel expandible Engorde */
+    #kpi-peso-sal-r { cursor: pointer; transition: border-color 0.2s; }
+    #kpi-peso-sal-r:hover { border-color: var(--blue); }
+    #kpi-peso-sal-r .kpi-label::after { content: ' \25BC'; font-size: 9px; color: var(--text-3); }
+    #kpi-peso-sal-r.expanded .kpi-label::after { content: ' \25B2'; }
+
+    .engorde-panel {
+      display: none; grid-column: 1 / -1;
+      background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: var(--radius);
+      padding: 20px 24px; margin-top: -4px;
+      animation: panelSlide 0.3s ease;
+    }
+    .engorde-panel.open { display: block; }
+
+    .engorde-chart-area { margin-bottom: 18px; }
+    .engorde-chart-area h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 8px 0; }
+
+    .engorde-panel-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;
+    }
+    @media (max-width: 900px) { .engorde-panel-grid { grid-template-columns: 1fr; } }
+    .engorde-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 12px 0; }
+
+    /* Weight journey bar */
+    .weight-journey { background: var(--bg-2); border-radius: 8px; padding: 14px; }
+    .wj-bar-wrap { position: relative; height: 32px; background: var(--bg-3); border-radius: 16px; margin: 12px 0 8px; overflow: hidden; }
+    .wj-bar-fill { height: 100%; border-radius: 16px; background: linear-gradient(90deg, #3a5fc0 0%, #4f7df5 40%, #2ecc8b 100%); transition: width 0.6s ease; }
+    .wj-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); }
+    .wj-center { text-align: center; margin-top: 6px; font-size: 13px; color: var(--text-1); }
+    .wj-center strong { color: var(--text-0); font-size: 15px; }
+
+    /* Kg dejados en la mesa */
+    .kg-mesa { background: var(--bg-2); border-radius: 8px; padding: 14px; margin-top: 12px; border-left: 3px solid var(--red); }
+    .kg-mesa .km-title { font-size: 11px; text-transform: uppercase; color: var(--text-3); letter-spacing: 0.5px; margin-bottom: 6px; }
+    .kg-mesa .km-val { font-size: 22px; font-weight: 700; }
+    .kg-mesa .km-detail { font-size: 11px; color: var(--text-2); margin-top: 4px; }
+
+    /* Zone chart extras */
+    .zone-danger { fill: rgba(232,93,93,0.08); }
+    .zone-target { fill: rgba(46,204,139,0.08); }
 </style>
 </head>
 <body>
@@ -393,6 +434,30 @@ body {
         <div class="kpi-card" id="kpi-conv-r"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia</div><div class="tt-desc">Kilos de alimento necesarios para producir 1 kg de carne. Menor es mejor.</div><div class="tt-calc">Calculo: Total alimento consumido ÷ Total ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
         <div class="kpi-card" id="kpi-mort-eng-r"><div class="kpi-label">Mortalidad Engorde</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad en Engorde</div><div class="tt-desc">Porcentaje de cerdos que mueren durante la etapa de engorde (recría + terminación).</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados a engorde) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
         <div class="kpi-card" id="kpi-peso-sal-r"><div class="kpi-label">Peso Medio Salida</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Salida</div><div class="tt-desc">Peso promedio al que se venden los cerdos terminados. Afecta el ingreso por cerdo.</div><div class="tt-calc">Calculo: Suma de pesos de salida ÷ Total cerdos vendidos</div><div class="tt-ref">Ref: Objetivo típico: 110-130 kg según mercado</div></div></div>
+        <!-- Panel expandible Perfil Engorde -->
+        <div class="engorde-panel" id="engorde-panel">
+          <div class="stock-loading" id="engorde-panel-loading">Cargando perfil de engorde...</div>
+          <div id="engorde-panel-content" style="display:none;">
+            <div class="engorde-chart-area">
+              <h4>Peso de Salida - Ultimos 6 Meses (Target: 115 kg)</h4>
+              <div class="chart-box" id="chart-peso-trend" style="min-height:180px;"></div>
+            </div>
+            <div class="engorde-panel-grid">
+              <div>
+                <h4>Viaje del Engorde</h4>
+                <div id="engorde-journey"></div>
+              </div>
+              <div>
+                <h4>Produccion del Periodo</h4>
+                <div id="engorde-produccion"></div>
+              </div>
+              <div>
+                <h4>Eficiencia</h4>
+                <div id="engorde-eficiencia"></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="section">
@@ -1437,6 +1502,240 @@ out.push({ month: period, value: k.value });
       loading.textContent = 'Error al cargar desglose: ' + e.message;
       console.error('Stock panel error:', e);
     }
+  }
+
+  // ---- ENGORDE PANEL ----
+  let engordePanelLoaded = false;
+
+  document.getElementById('kpi-peso-sal-r').addEventListener('click', function(e) {
+    if (e.target.closest('.kpi-tooltip')) return;
+    const panel = document.getElementById('engorde-panel');
+    const card = this;
+    const isOpen = panel.classList.contains('open');
+    panel.classList.toggle('open');
+    card.classList.toggle('expanded');
+    if (!isOpen && !engordePanelLoaded) {
+      loadEngordePanel();
+    }
+  });
+
+  async function loadEngordePanel() {
+    const start = monthStart(-5);
+    const end = today();
+    const loading = document.getElementById('engorde-panel-loading');
+    const content = document.getElementById('engorde-panel-content');
+    const TARGET_WEIGHT = 115;
+
+    try {
+      // 1) Monthly peso de salida trend (6 months)
+      const months = last6Months();
+      const pesoMonthly = [];
+      const gdpMonthly = [];
+      for (const m of months) {
+        try {
+          const md = await fetchKpis('sitio3', ['WAVERAGE_WEIGHT_OUTPUT_STAGE','DAILY_WEIGHT_GAIN_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE'], m.start, m.end, 'farm_id');
+          pesoMonthly.push({ month: m.start, label: monthLabel(m.start), value: extractKpiValue(md, 'WAVERAGE_WEIGHT_OUTPUT_STAGE'), cabezas: extractKpiValue(md, 'TOTAL_ANIMAL_OUTPUT_STAGE') });
+          gdpMonthly.push({ month: m.start, label: monthLabel(m.start), value: extractKpiValue(md, 'DAILY_WEIGHT_GAIN_STAGE') });
+        } catch (_) {
+          pesoMonthly.push({ month: m.start, label: monthLabel(m.start), value: null, cabezas: null });
+          gdpMonthly.push({ month: m.start, label: monthLabel(m.start), value: null });
+        }
+      }
+
+      // Render peso trend chart with colored zones
+      renderPesoTrendChart('chart-peso-trend', pesoMonthly, TARGET_WEIGHT);
+
+      // 2) Aggregate KPIs for the period
+      const aggKpis = [
+        'WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE',
+        'DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE',
+        'RATE_MORTALITY_INPLACE_STAGE',
+        'TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_ANIMAL_INPUT_STAGE',
+        'TOTAL_ANIMAL_DEAD_STAGE','AVERAGE_DAYS_STAGE',
+        'AVERAGE_AGE_OUTPUT_STAGE','TOTAL_WEIGHT_OUTPUT_STAGE'
+      ];
+      const aggData = await fetchKpis('sitio3', aggKpis, start, end, 'farm_id');
+      const v = (code) => extractKpiValue(aggData, code);
+
+      const pesoEntrada = v('WAVERAGE_WEIGHT_INPUT_STAGE');
+      const pesoSalida = v('WAVERAGE_WEIGHT_OUTPUT_STAGE');
+      const gdp = v('DAILY_WEIGHT_GAIN_STAGE');
+      const diasEngorde = v('AVERAGE_DAYS_STAGE');
+      const conversion = v('FEED_CONVERSION_RATIO_STAGE');
+      const mortalidad = v('RATE_MORTALITY_INPLACE_STAGE');
+      const cabezasIn = v('TOTAL_ANIMAL_INPUT_STAGE');
+      const cabezasOut = v('TOTAL_ANIMAL_OUTPUT_STAGE');
+      const muertos = v('TOTAL_ANIMAL_DEAD_STAGE');
+      const kgTotales = v('TOTAL_WEIGHT_OUTPUT_STAGE');
+      const edadSalida = v('AVERAGE_AGE_OUTPUT_STAGE');
+
+      // --- JOURNEY ---
+      const pE = parseFloat(String(pesoEntrada || 0).replace(/\./g, '').replace(',', '.')) || 0;
+      const pS = parseFloat(String(pesoSalida || 0).replace(/\./g, '').replace(',', '.')) || 0;
+      const ganancia = pS - pE;
+      const pctTarget = Math.min(100, (pS / TARGET_WEIGHT) * 100);
+
+      let journeyHtml = '<div class="weight-journey">';
+      journeyHtml += '<div class="wj-labels"><span>Entrada: <strong style="color:var(--text-0)">' + fmtNum(pesoEntrada, 1) + ' kg</strong></span><span>Target: ' + TARGET_WEIGHT + ' kg</span><span>Salida: <strong style="color:' + (pS >= TARGET_WEIGHT ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(pesoSalida, 1) + ' kg</strong></span></div>';
+      journeyHtml += '<div class="wj-bar-wrap"><div class="wj-bar-fill" style="width:' + pctTarget.toFixed(0) + '%"></div></div>';
+      journeyHtml += '<div class="wj-center">Ganancia: <strong>' + fmtNum(ganancia, 1) + ' kg</strong> en <strong>' + fmtNum(diasEngorde, 0) + '</strong> dias</div>';
+      journeyHtml += '<div class="wj-center" style="margin-top:2px;">GDP: <strong style="color:' + (parseFloat(String(gdp || 0).replace(/\./g, '').replace(',', '.')) >= 0.8 ? 'var(--green)' : 'var(--yellow)') + '">' + fmtNum(gdp, 3) + ' kg/dia</strong></div>';
+      journeyHtml += '</div>';
+
+      // Kg dejados en la mesa
+      const cabOut = parseFloat(String(cabezasOut || 0).replace(/\./g, '').replace(',', '.')) || 0;
+      const deficit = TARGET_WEIGHT - pS;
+      const kgMesa = deficit > 0 ? deficit * cabOut : 0;
+      journeyHtml += '<div class="kg-mesa">';
+      journeyHtml += '<div class="km-title">Kg dejados en la mesa</div>';
+      if (deficit > 0) {
+        journeyHtml += '<div class="km-val" style="color:var(--red);">' + fmtInt(Math.round(kgMesa)) + ' kg</div>';
+        journeyHtml += '<div class="km-detail">(' + TARGET_WEIGHT + ' - ' + fmtNum(pS, 1) + ') x ' + fmtInt(cabOut) + ' cab = ' + fmtInt(Math.round(kgMesa)) + ' kg sin facturar</div>';
+      } else {
+        journeyHtml += '<div class="km-val" style="color:var(--green);">0 kg</div>';
+        journeyHtml += '<div class="km-detail">Peso de salida cumple o supera el target de ' + TARGET_WEIGHT + ' kg</div>';
+      }
+      journeyHtml += '</div>';
+      document.getElementById('engorde-journey').innerHTML = journeyHtml;
+
+      // --- PRODUCCION ---
+      let prodHtml = '';
+      prodHtml += '<div class="flow-row"><span class="flow-label">Cabezas ingresadas</span><span class="flow-val in">+' + fmtInt(cabezasIn) + '</span></div>';
+      prodHtml += '<div class="flow-row"><span class="flow-label">Cabezas vendidas</span><span class="flow-val" style="color:var(--blue);">' + fmtInt(cabezasOut) + '</span></div>';
+      prodHtml += '<div class="flow-row"><span class="flow-label">Muertos en engorde</span><span class="flow-val out">-' + fmtInt(muertos) + '</span></div>';
+      prodHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Kg totales producidos</span><span class="flow-val" style="font-size:15px;color:var(--green);">' + fmtInt(kgTotales) + ' kg</span></div>';
+
+      // Monthly breakdown mini table
+      let mTblHtml = '<div style="margin-top:12px;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Desglose mensual</div>';
+      pesoMonthly.forEach(m => {
+        if (m.value != null) {
+          const mv = parseFloat(String(m.value).replace(/\./g, '').replace(',', '.'));
+          const mc = m.cabezas ? parseFloat(String(m.cabezas).replace(/\./g, '').replace(',', '.')) : 0;
+          const mDef = TARGET_WEIGHT - mv;
+          const mKgMesa = mDef > 0 ? mDef * mc : 0;
+          mTblHtml += '<div class="flow-row"><span class="flow-label">' + m.label + ' (' + fmtInt(mc) + ' cab)</span><span class="flow-val" style="color:' + (mv >= TARGET_WEIGHT ? 'var(--green)' : mv >= 100 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(mv, 1) + ' kg</span></div>';
+        }
+      });
+      prodHtml += mTblHtml;
+      document.getElementById('engorde-produccion').innerHTML = prodHtml;
+
+      // --- EFICIENCIA ---
+      let efHtml = '';
+      const gdpNum = parseFloat(String(gdp || 0).replace(/\./g, '').replace(',', '.'));
+      const convNum = parseFloat(String(conversion || 0).replace(/\./g, '').replace(',', '.'));
+      const mortNum = parseFloat(String(mortalidad || 0).replace(/\./g, '').replace(',', '.'));
+
+      efHtml += '<div class="mini-kpi"><span class="mk-label">GDP (promedio)</span><span class="mk-val" style="color:' + (gdpNum >= 0.8 ? 'var(--green)' : gdpNum >= 0.7 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(gdp, 3) + ' kg/d</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">Bench GDP</span><span class="mk-val" style="color:var(--text-3);">0,85 kg/d</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">Conversion Alimenticia</span><span class="mk-val" style="color:' + (convNum > 0 && convNum <= 2.5 ? 'var(--green)' : convNum <= 2.8 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(conversion, 2) + '</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">Bench Conversion</span><span class="mk-val" style="color:var(--text-3);">2,50</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">Mortalidad Engorde</span><span class="mk-val" style="color:' + (mortNum <= 3 ? 'var(--green)' : mortNum <= 5 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtPct(mortalidad) + '</span></div>';
+      efHtml += '<div class="mini-kpi"><span class="mk-label">Dias en engorde (prom)</span><span class="mk-val">' + fmtNum(diasEngorde, 0) + ' d</span></div>';
+      if (edadSalida) {
+        efHtml += '<div class="mini-kpi"><span class="mk-label">Edad salida (prom)</span><span class="mk-val">' + fmtNum(edadSalida, 0) + ' d</span></div>';
+      }
+      efHtml += '<div class="mini-kpi" style="margin-top:8px;border-top:2px solid var(--bg-3);padding-top:8px;"><span class="mk-label" style="font-weight:600;">Peso salida vs target</span><span class="mk-val" style="color:' + (pS >= TARGET_WEIGHT ? 'var(--green)' : 'var(--red)') + ';">' + fmtNum(pesoSalida, 1) + ' / ' + TARGET_WEIGHT + ' kg</span></div>';
+
+      document.getElementById('engorde-eficiencia').innerHTML = efHtml;
+
+      engordePanelLoaded = true;
+      loading.style.display = 'none';
+      content.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error al cargar perfil: ' + e.message;
+      console.error('Engorde panel error:', e);
+    }
+  }
+
+  // Custom chart with colored zones for peso de salida
+  function renderPesoTrendChart(containerId, dataPoints, target) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const pts = dataPoints.filter(p => p.value != null && !isNaN(parseFloat(String(p.value).replace(/\./g, '').replace(',', '.'))));
+    if (pts.length === 0) {
+      container.innerHTML = '<div class="table-empty">Sin datos de peso de salida</div>';
+      return;
+    }
+
+    const W = 700, H = 220, PL = 50, PR = 20, PT = 15, PB = 35;
+    const cw = W - PL - PR, ch = H - PT - PB;
+    const DANGER = 100;
+
+    const vals = pts.map(p => parseFloat(String(p.value).replace(/\./g, '').replace(',', '.')));
+    const allVals = [...vals, target, DANGER];
+    let minV = Math.min(...allVals) - 5;
+    let maxV = Math.max(...allVals) + 5;
+
+    function x(i) { return PL + (pts.length > 1 ? i / (pts.length - 1) * cw : cw / 2); }
+    function y(v) { return PT + ch - ((v - minV) / (maxV - minV)) * ch; }
+
+    // Zones
+    let zones = '';
+    // Danger zone: below DANGER
+    const dangerTop = y(DANGER);
+    const dangerBot = y(minV);
+    zones += '<rect x="' + PL + '" y="' + dangerTop + '" width="' + cw + '" height="' + (dangerBot - dangerTop) + '" class="zone-danger" />';
+    // Target zone: above target
+    const targetTop = y(maxV);
+    const targetBot = y(target);
+    zones += '<rect x="' + PL + '" y="' + targetTop + '" width="' + cw + '" height="' + (targetBot - targetTop) + '" class="zone-target" />';
+
+    // Grid
+    let grid = '';
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const gy = PT + (ch / steps) * i;
+      const gv = maxV - ((maxV - minV) / steps) * i;
+      grid += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" class="chart-grid" />';
+      grid += '<text x="' + (PL - 8) + '" y="' + (gy + 4) + '" text-anchor="end" class="chart-label">' + Math.round(gv) + '</text>';
+    }
+
+    // Target line
+    const ty = y(target);
+    let bench = '<line x1="' + PL + '" y1="' + ty + '" x2="' + (W - PR) + '" y2="' + ty + '" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.7" />';
+    bench += '<text x="' + (W - PR + 2) + '" y="' + (ty - 4) + '" fill="var(--green)" font-size="10" font-family="Inter,sans-serif">' + target + ' kg</text>';
+
+    // Danger line
+    const dy = y(DANGER);
+    bench += '<line x1="' + PL + '" y1="' + dy + '" x2="' + (W - PR) + '" y2="' + dy + '" stroke="var(--red)" stroke-width="1" stroke-dasharray="4,4" opacity="0.5" />';
+    bench += '<text x="' + (W - PR + 2) + '" y="' + (dy - 4) + '" fill="var(--red)" font-size="9" font-family="Inter,sans-serif" opacity="0.7">Alerta</text>';
+
+    // Line path
+    let path = '';
+    let areaPath = '';
+    pts.forEach((p, i) => {
+      const pv = parseFloat(String(p.value).replace(/\./g, '').replace(',', '.'));
+      const px = x(i), py = y(pv);
+      path += (i === 0 ? 'M ' : ' L ') + px + ' ' + py;
+      areaPath += (i === 0 ? 'M ' : ' L ') + px + ' ' + py;
+    });
+    areaPath += ' L ' + x(pts.length - 1) + ' ' + (PT + ch) + ' L ' + x(0) + ' ' + (PT + ch) + ' Z';
+
+    // Dots with color coding
+    let dots = '';
+    pts.forEach((p, i) => {
+      const pv = parseFloat(String(p.value).replace(/\./g, '').replace(',', '.'));
+      const px = x(i), py = y(pv);
+      const dotColor = pv >= target ? 'var(--green)' : pv >= DANGER ? 'var(--yellow)' : 'var(--red)';
+      dots += '<circle cx="' + px + '" cy="' + py + '" r="5" fill="' + dotColor + '" stroke="var(--bg-1)" stroke-width="2" />';
+      dots += '<text x="' + px + '" y="' + (py - 12) + '" text-anchor="middle" fill="' + dotColor + '" font-size="12" font-weight="600" font-family="Inter,sans-serif">' + fmtNum(pv, 1) + '</text>';
+    });
+
+    // Labels
+    let labels = '';
+    pts.forEach((p, i) => {
+      labels += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" class="chart-label">' + (p.label || '') + '</text>';
+    });
+
+    const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">'
+      + zones + grid + bench
+      + '<path d="' + areaPath + '" fill="var(--blue)" opacity="0.07" />'
+      + '<path d="' + path + '" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round" />'
+      + dots + labels
+      + '</svg>';
+
+    container.innerHTML = svg;
   }
 
   // ---- CONFIG: TEST CONNECTION ----
