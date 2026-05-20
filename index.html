@@ -282,27 +282,31 @@ body {
     .kpi-current .cur-delta.down-good { color: var(--green); }
     .kpi-current .cur-delta.down-bad { color: var(--red); }
 
-    /* Panel expandible Stock Madres */
-    #kpi-stock { cursor: pointer; transition: border-color 0.2s; }
-    #kpi-stock:hover { border-color: var(--blue); }
-    #kpi-stock .kpi-label::after { content: ' \25BC'; font-size: 9px; color: var(--text-3); }
-    #kpi-stock.expanded .kpi-label::after { content: ' \25B2'; }
+    /* Expandable KPI cards (generic) */
+    .kpi-expandable { cursor: pointer; transition: border-color 0.2s; }
+    .kpi-expandable:hover { border-color: var(--blue); }
+    .kpi-expandable .kpi-label::after { content: ' \25BC'; font-size: 9px; color: var(--text-3); }
+    .kpi-expandable.expanded .kpi-label::after { content: ' \25B2'; }
 
-    .stock-panel {
+    .expand-panel {
       display: none; grid-column: 1 / -1;
       background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: var(--radius);
       padding: 20px 24px; margin-top: -4px;
       animation: panelSlide 0.3s ease;
     }
-    .stock-panel.open { display: block; }
+    .expand-panel.open { display: block; }
     @keyframes panelSlide { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .expand-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 12px 0; }
+    .expand-panel-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;
+    }
+    @media (max-width: 900px) { .expand-panel-grid { grid-template-columns: 1fr; } }
 
     .stock-panel-grid {
       display: grid; grid-template-columns: 220px 1fr 1fr; gap: 20px; align-items: start;
     }
     @media (max-width: 900px) { .stock-panel-grid { grid-template-columns: 1fr; } }
-
-    .stock-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 12px 0; }
 
     /* Donut chart */
     .donut-wrap { display: flex; flex-direction: column; align-items: center; }
@@ -326,26 +330,6 @@ body {
     .mini-kpi .mk-val { font-weight: 600; color: var(--text-0); }
 
     .stock-loading { text-align: center; padding: 30px; color: var(--text-3); font-size: 13px; }
-
-    /* Panel expandible Engorde */
-    #kpi-peso-sal-r { cursor: pointer; transition: border-color 0.2s; }
-    #kpi-peso-sal-r:hover { border-color: var(--blue); }
-    #kpi-peso-sal-r .kpi-label::after { content: ' \25BC'; font-size: 9px; color: var(--text-3); }
-    #kpi-peso-sal-r.expanded .kpi-label::after { content: ' \25B2'; }
-
-    .engorde-panel {
-      display: none; grid-column: 1 / -1;
-      background: var(--bg-1); border: 1px solid var(--bg-3); border-radius: var(--radius);
-      padding: 20px 24px; margin-top: -4px;
-      animation: panelSlide 0.3s ease;
-    }
-    .engorde-panel.open { display: block; }
-
-    .engorde-panel-grid {
-      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;
-    }
-    @media (max-width: 900px) { .engorde-panel-grid { grid-template-columns: 1fr; } }
-    .engorde-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 12px 0; }
 
     /* Monthly peso table */
     .peso-month-row { display: flex; align-items: center; padding: 7px 10px; border-radius: 6px; margin-bottom: 4px; font-size: 13px; }
@@ -404,14 +388,9 @@ body {
     <div class="section">
       <div class="section-title">Plantel Reproductivo</div>
       <div class="kpi-grid" id="kpi-resumen-prod">
-        <div class="kpi-card" id="kpi-stock"><div class="kpi-label">Stock Madres</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Stock de Madres Activas</div><div class="tt-desc">Cantidad de hembras reproductoras activas en el plantel (preñadas, lactando, vacías en servicio).</div><div class="tt-calc">Calculo: Conteo de hembras con estado activo en el sistema.</div><div class="tt-ref">Ref: Objetivo JOFA: 900 madres</div></div></div>
-        <div class="kpi-card" id="kpi-psy"><div class="kpi-label">PSY</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">PSY — Destetados/Hembra/Año</div><div class="tt-desc">Cerdos destetados por hembra en inventario por año. Es EL indicador clave de productividad de la granja.</div><div class="tt-calc">Calculo: (Total destetados ÷ Hembras promedio) × (365 ÷ días del período)</div><div class="tt-ref">Ref: Top 10%: >30 | Buen nivel: 27-30 | Promedio: 24-27</div></div></div>
-        <div class="kpi-card" id="kpi-tp"><div class="kpi-label">Tasa Paricion</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Tasa de Parición</div><div class="tt-desc">Porcentaje de hembras servidas que efectivamente paren. Refleja fertilidad y manejo reproductivo.</div><div class="tt-calc">Calculo: (Partos ÷ Servicios del período correspondiente) × 100</div><div class="tt-ref">Ref: Excelente: >92% | Bueno: 88-92% | Alerta: <85%</div></div></div>
-        <div class="kpi-card" id="kpi-nv"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Nacidos Vivos Promedio</div><div class="tt-desc">Promedio de lechones nacidos vivos por parto. Indicador de prolificidad genética y manejo.</div><div class="tt-calc">Calculo: Total nacidos vivos ÷ Total partos</div><div class="tt-ref">Ref: Top: >14.5 | Bueno: 13-14.5 | Promedio: 11.5-13</div></div></div>
-        <div class="kpi-card" id="kpi-mpd"><div class="kpi-label">Mort. Pre-Destete</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que mueren antes del destete. Refleja calidad de manternidad.</div><div class="tt-calc">Calculo: (Muertos en lactancia ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
-        <div class="kpi-card" id="kpi-dnp"><div class="kpi-label">Dias No Productivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Días No Productivos</div><div class="tt-desc">Días en que la hembra no está preñada ni lactando. Impactan directamente el PSY y la rentabilidad.</div><div class="tt-calc">Calculo: Días vacíos + días de repeticiones + días de descarte no productivo</div><div class="tt-ref">Ref: Excelente: <30 | Aceptable: 30-45 | Alerta: >50</div></div></div>
-        <!-- Panel expandible Stock Madres -->
-        <div class="stock-panel" id="stock-panel">
+        <div class="kpi-card kpi-expandable" id="kpi-stock"><div class="kpi-label">Stock Madres</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Stock de Madres Activas</div><div class="tt-desc">Cantidad de hembras reproductoras activas en el plantel (preñadas, lactando, vacías en servicio).</div><div class="tt-calc">Calculo: Conteo de hembras con estado activo en el sistema.</div><div class="tt-ref">Ref: Objetivo JOFA: 900 madres</div></div></div>
+        <!-- Panel Stock Madres -->
+        <div class="expand-panel" id="panel-stock">
           <div class="stock-loading" id="stock-panel-loading">Cargando desglose del plantel...</div>
           <div class="stock-panel-grid" id="stock-panel-content" style="display:none;">
             <div class="donut-wrap">
@@ -429,24 +408,109 @@ body {
             </div>
           </div>
         </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-psy"><div class="kpi-label">PSY</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">PSY — Destetados/Hembra/Año</div><div class="tt-desc">Cerdos destetados por hembra en inventario por año. Es EL indicador clave de productividad de la granja.</div><div class="tt-calc">Calculo: (Total destetados ÷ Hembras promedio) × (365 ÷ días del período)</div><div class="tt-ref">Ref: Top 10%: >30 | Buen nivel: 27-30 | Promedio: 24-27</div></div></div>
+        <!-- Panel PSY -->
+        <div class="expand-panel" id="panel-psy">
+          <div class="stock-loading" id="panel-psy-loading">Cargando tendencia PSY...</div>
+          <div id="panel-psy-content" style="display:none;">
+            <h4>Tendencia PSY - Ultimos 6 Meses</h4>
+            <div id="panel-psy-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-psy-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-tp"><div class="kpi-label">Tasa Paricion</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Tasa de Parición</div><div class="tt-desc">Porcentaje de hembras servidas que efectivamente paren. Refleja fertilidad y manejo reproductivo.</div><div class="tt-calc">Calculo: (Partos ÷ Servicios del período correspondiente) × 100</div><div class="tt-ref">Ref: Excelente: >92% | Bueno: 88-92% | Alerta: <85%</div></div></div>
+        <!-- Panel Tasa Paricion -->
+        <div class="expand-panel" id="panel-tp">
+          <div class="stock-loading" id="panel-tp-loading">Cargando tendencia Tasa Paricion...</div>
+          <div id="panel-tp-content" style="display:none;">
+            <h4>Tendencia Tasa Paricion - Ultimos 6 Meses</h4>
+            <div id="panel-tp-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-tp-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-nv"><div class="kpi-label">Nacidos Vivos Prom.</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Nacidos Vivos Promedio</div><div class="tt-desc">Promedio de lechones nacidos vivos por parto. Indicador de prolificidad genética y manejo.</div><div class="tt-calc">Calculo: Total nacidos vivos ÷ Total partos</div><div class="tt-ref">Ref: Top: >14.5 | Bueno: 13-14.5 | Promedio: 11.5-13</div></div></div>
+        <!-- Panel Nacidos Vivos -->
+        <div class="expand-panel" id="panel-nv">
+          <div class="stock-loading" id="panel-nv-loading">Cargando tendencia Nacidos Vivos...</div>
+          <div id="panel-nv-content" style="display:none;">
+            <h4>Tendencia Nacidos Vivos - Ultimos 6 Meses</h4>
+            <div id="panel-nv-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-nv-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-mpd"><div class="kpi-label">Mort. Pre-Destete</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que mueren antes del destete. Refleja calidad de manternidad.</div><div class="tt-calc">Calculo: (Muertos en lactancia ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
+        <!-- Panel Mort Pre-Destete -->
+        <div class="expand-panel" id="panel-mpd">
+          <div class="stock-loading" id="panel-mpd-loading">Cargando tendencia Mort. Pre-Destete...</div>
+          <div id="panel-mpd-content" style="display:none;">
+            <h4>Tendencia Mortalidad Pre-Destete - Ultimos 6 Meses</h4>
+            <div id="panel-mpd-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-mpd-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-dnp"><div class="kpi-label">Dias No Productivos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Días No Productivos</div><div class="tt-desc">Días en que la hembra no está preñada ni lactando. Impactan directamente el PSY y la rentabilidad.</div><div class="tt-calc">Calculo: Días vacíos + días de repeticiones + días de descarte no productivo</div><div class="tt-ref">Ref: Excelente: <30 | Aceptable: 30-45 | Alerta: >50</div></div></div>
+        <!-- Panel DNP -->
+        <div class="expand-panel" id="panel-dnp">
+          <div class="stock-loading" id="panel-dnp-loading">Cargando tendencia DNP...</div>
+          <div id="panel-dnp-content" style="display:none;">
+            <h4>Tendencia Dias No Productivos - Ultimos 6 Meses</h4>
+            <div id="panel-dnp-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-dnp-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="section">
       <div class="section-title">Engorde / Terminacion</div>
       <div class="kpi-grid" id="kpi-resumen-eng">
-        <div class="kpi-card" id="kpi-gdp-r"><div class="kpi-label">GDP</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">GDP — Ganancia Diaria de Peso</div><div class="tt-desc">Gramos de peso que gana el cerdo por día en engorde. Indicador de eficiencia productiva.</div><div class="tt-calc">Calculo: (Peso salida - Peso entrada) ÷ Días en engorde</div><div class="tt-ref">Ref: Excelente: >0.85 kg/d | Bueno: 0.75-0.85 | Alerta: <0.70</div></div></div>
-        <div class="kpi-card" id="kpi-conv-r"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia</div><div class="tt-desc">Kilos de alimento necesarios para producir 1 kg de carne. Menor es mejor.</div><div class="tt-calc">Calculo: Total alimento consumido ÷ Total ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
-        <div class="kpi-card" id="kpi-mort-eng-r"><div class="kpi-label">Mortalidad Engorde</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad en Engorde</div><div class="tt-desc">Porcentaje de cerdos que mueren durante la etapa de engorde (recría + terminación).</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados a engorde) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
-        <div class="kpi-card" id="kpi-peso-sal-r"><div class="kpi-label">Peso Medio Salida</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Salida</div><div class="tt-desc">Peso promedio al que se venden los cerdos terminados. Afecta el ingreso por cerdo.</div><div class="tt-calc">Calculo: Suma de pesos de salida ÷ Total cerdos vendidos</div><div class="tt-ref">Ref: Objetivo típico: 110-130 kg según mercado</div></div></div>
-        <!-- Panel expandible Perfil Engorde -->
-        <div class="engorde-panel" id="engorde-panel">
+        <div class="kpi-card kpi-expandable" id="kpi-gdp-r"><div class="kpi-label">GDP</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">GDP — Ganancia Diaria de Peso</div><div class="tt-desc">Gramos de peso que gana el cerdo por día en engorde. Indicador de eficiencia productiva.</div><div class="tt-calc">Calculo: (Peso salida - Peso entrada) ÷ Días en engorde</div><div class="tt-ref">Ref: Excelente: >0.85 kg/d | Bueno: 0.75-0.85 | Alerta: <0.70</div></div></div>
+        <!-- Panel GDP -->
+        <div class="expand-panel" id="panel-gdp">
+          <div class="stock-loading" id="panel-gdp-loading">Cargando tendencia GDP...</div>
+          <div id="panel-gdp-content" style="display:none;">
+            <h4>Tendencia GDP - Ultimos 6 Meses</h4>
+            <div id="panel-gdp-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-gdp-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-conv-r"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia</div><div class="tt-desc">Kilos de alimento necesarios para producir 1 kg de carne. Menor es mejor.</div><div class="tt-calc">Calculo: Total alimento consumido ÷ Total ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
+        <!-- Panel Conversion -->
+        <div class="expand-panel" id="panel-conv">
+          <div class="stock-loading" id="panel-conv-loading">Cargando tendencia Conversion...</div>
+          <div id="panel-conv-content" style="display:none;">
+            <h4>Tendencia Conversion Alimenticia - Ultimos 6 Meses</h4>
+            <div id="panel-conv-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-conv-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-mort-eng-r"><div class="kpi-label">Mortalidad Engorde</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad en Engorde</div><div class="tt-desc">Porcentaje de cerdos que mueren durante la etapa de engorde (recría + terminación).</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados a engorde) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
+        <!-- Panel Mortalidad Engorde -->
+        <div class="expand-panel" id="panel-mort-eng">
+          <div class="stock-loading" id="panel-mort-eng-loading">Cargando tendencia Mortalidad Engorde...</div>
+          <div id="panel-mort-eng-content" style="display:none;">
+            <h4>Tendencia Mortalidad Engorde - Ultimos 6 Meses</h4>
+            <div id="panel-mort-eng-chart" style="min-height:180px;"></div>
+            <div class="expand-panel-grid" id="panel-mort-eng-kpis" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-expandable" id="kpi-peso-sal-r"><div class="kpi-label">Peso Medio Salida</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Salida</div><div class="tt-desc">Peso promedio al que se venden los cerdos terminados. Afecta el ingreso por cerdo.</div><div class="tt-calc">Calculo: Suma de pesos de salida ÷ Total cerdos vendidos</div><div class="tt-ref">Ref: Objetivo típico: 110-130 kg según mercado</div></div></div>
+        <!-- Panel Perfil Engorde (peso salida) -->
+        <div class="expand-panel" id="panel-engorde">
           <div class="stock-loading" id="engorde-panel-loading">Cargando perfil de engorde...</div>
           <div id="engorde-panel-content" style="display:none;">
             <div style="margin-bottom:16px;">
-              <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-2);margin:0 0 10px 0;">Peso de Salida Mensual (Target: 115 kg)</h4>
+              <h4>Peso de Salida Mensual (Target: 115 kg)</h4>
               <div id="engorde-peso-monthly"></div>
             </div>
-            <div class="engorde-panel-grid">
+            <div class="expand-panel-grid">
               <div>
                 <h4>Viaje del Engorde</h4>
                 <div id="engorde-journey"></div>
@@ -464,12 +528,7 @@ body {
         </div>
       </div>
     </div>
-    <div class="section">
-      <div class="section-title">Evolucion PSY - Ultimos 6 Meses</div>
-      <div class="chart-box" id="chart-psy-trend">
-        <div class="loading-overlay"><div class="spinner"></div> Cargando datos...</div>
-      </div>
-    </div>
+    <!-- PSY chart moved inside PSY expandable card above -->
   </div>
 
   <!-- SERVICIO -->
@@ -1128,31 +1187,6 @@ out.push({ month: period, value: k.value });
       console.error('Current month S3 error:', e);
     }
 
-    // PSY trend chart
-    try {
-      const months = last6Months();
-      const psyData = await fetchKpis('sitio1', ['PIGS_WEANED_MATED_FEMALE_YEAR'], months[0].start, months[months.length-1].end, 'year_month');
-      let psyPts = extractKpiMonthly(psyData, 'PIGS_WEANED_MATED_FEMALE_YEAR');
-      if (psyPts.length === 0) {
-        // try fetching per month
-        const pts = [];
-        for (const m of months) {
-          try {
-            const md = await fetchKpis('sitio1', ['PIGS_WEANED_MATED_FEMALE_YEAR'], m.start, m.end, 'farm_id');
-            const val = extractKpiValue(md, 'PIGS_WEANED_MATED_FEMALE_YEAR');
-            pts.push({ month: m.start, label: monthLabel(m.start), value: val });
-          } catch (_) {
-            pts.push({ month: m.start, label: monthLabel(m.start), value: null });
-          }
-        }
-        psyPts = pts;
-      } else {
-        psyPts = psyPts.map(p => ({ ...p, label: monthLabel(p.month) }));
-      }
-      renderLineChart('chart-psy-trend', psyPts, BENCHMARKS.PSY, 'PSY');
-    } catch (e) {
-      document.getElementById('chart-psy-trend').innerHTML = '<div class="table-empty">Error al cargar tendencia PSY: ' + e.message + '</div>';
-    }
   }
 
   // ---- SERVICIO ----
@@ -1367,21 +1401,131 @@ out.push({ month: period, value: k.value });
     ]);
   }
 
-  // ---- STOCK MADRES PANEL ----
-  let stockPanelLoaded = false;
+  // ---- EXPANDABLE CARD SYSTEM ----
+  const panelLoaded = {};
+  const panelMap = {
+    'kpi-stock': { panel: 'panel-stock', loader: () => loadStockPanel() },
+    'kpi-psy': { panel: 'panel-psy', loader: () => loadPanelTrend('psy', 'sitio1', 'PIGS_WEANED_MATED_FEMALE_YEAR', BENCHMARKS.PSY, '#4f7df5', [
+      { code: 'PIGS_WEANED_MATED_FEMALE_YEAR', label: 'PSY Acumulado', fmt: (v) => fmtNum(v, 2) },
+      { code: 'LITTERS_FEMALE_YEAR', label: 'Partos/Hembra/Año', fmt: (v) => fmtNum(v, 2) },
+      { code: 'AVERAGE_WEANING_PIGLETS', label: 'Destetados/Camada', fmt: (v) => fmtNum(v, 1) }
+    ]) },
+    'kpi-tp': { panel: 'panel-tp', loader: () => loadPanelTrend('tp', 'sitio1', 'FARROWING_RATE', BENCHMARKS.FARROWING_RATE, '#4f7df5', [
+      { code: 'FARROWING_RATE', label: 'Tasa Paricion (%)', fmt: (v) => fmtPct(v) },
+      { code: 'TOTAL_FARROWINGS', label: 'Total Partos', fmt: (v) => fmtInt(v) },
+      { code: 'TOTAL_SERVICES', label: 'Total Servicios', fmt: (v) => fmtInt(v) }
+    ]) },
+    'kpi-nv': { panel: 'panel-nv', loader: () => loadPanelTrend('nv', 'sitio1', 'AVERAGE_BORN_ALIVE', BENCHMARKS.BORN_ALIVE, '#2ecc8b', [
+      { code: 'AVERAGE_BORN_ALIVE', label: 'Nacidos Vivos Prom.', fmt: (v) => fmtNum(v, 1) },
+      { code: 'TOTAL_BORN_ALIVE', label: 'Total Nacidos Vivos', fmt: (v) => fmtInt(v) },
+      { code: 'AVERAGE_STILLBORN', label: 'Nacidos Muertos Prom.', fmt: (v) => fmtNum(v, 1) },
+      { code: 'AVERAGE_MUMMIFIED', label: 'Momificados Prom.', fmt: (v) => fmtNum(v, 1) }
+    ]) },
+    'kpi-mpd': { panel: 'panel-mpd', loader: () => loadPanelTrend('mpd', 'sitio1', 'RATE_WEANING_PIG_DEATHS', BENCHMARKS.PRE_WEAN_MORT, '#e85d5d', [
+      { code: 'RATE_WEANING_PIG_DEATHS', label: 'Mort. Pre-Destete (%)', fmt: (v) => fmtPct(v) },
+      { code: 'TOTAL_WEANING_PIG_DEATHS', label: 'Total Muertos Lactancia', fmt: (v) => fmtInt(v) },
+      { code: 'TOTAL_BORN_ALIVE', label: 'Total Nacidos Vivos', fmt: (v) => fmtInt(v) }
+    ]) },
+    'kpi-dnp': { panel: 'panel-dnp', loader: () => loadPanelTrend('dnp', 'sitio1', 'AVERAGE_NON_PRODUCTIVE_DAYS', BENCHMARKS.NPD, '#f0c040', [
+      { code: 'AVERAGE_NON_PRODUCTIVE_DAYS', label: 'DNP Promedio', fmt: (v) => fmtNum(v, 0) + ' dias' },
+      { code: 'AVERAGE_WMI_DAYS', label: 'Destete-Cubricion (dias)', fmt: (v) => fmtNum(v, 1) },
+      { code: 'RATE_HEAT_REPETITION', label: 'Repeticion Celo (%)', fmt: (v) => fmtPct(v) }
+    ]) },
+    'kpi-gdp-r': { panel: 'panel-gdp', loader: () => loadPanelTrend('gdp', 'sitio3', 'DAILY_WEIGHT_GAIN_STAGE', BENCHMARKS.GDP, '#2ecc8b', [
+      { code: 'DAILY_WEIGHT_GAIN_STAGE', label: 'GDP (kg/dia)', fmt: (v) => fmtNum(v, 3) },
+      { code: 'WAVERAGE_WEIGHT_INPUT_STAGE', label: 'Peso Entrada (kg)', fmt: (v) => fmtNum(v, 1) },
+      { code: 'WAVERAGE_WEIGHT_OUTPUT_STAGE', label: 'Peso Salida (kg)', fmt: (v) => fmtNum(v, 1) },
+      { code: 'WAVERAGE_DAYS_IN_STAGE_STAGE', label: 'Dias en Engorde', fmt: (v) => fmtNum(v, 0) }
+    ]) },
+    'kpi-conv-r': { panel: 'panel-conv', loader: () => loadPanelTrend('conv', 'sitio3', 'FEED_CONVERSION_RATIO_STAGE', BENCHMARKS.FEED_CONV, '#f0c040', [
+      { code: 'FEED_CONVERSION_RATIO_STAGE', label: 'Conversion', fmt: (v) => fmtNum(v, 2) },
+      { code: 'TOTAL_FEED_PER_ANIMAL_STAGE', label: 'Alimento/Animal (kg)', fmt: (v) => fmtNum(v, 1) },
+      { code: 'DAILY_WEIGHT_GAIN_STAGE', label: 'GDP (kg/dia)', fmt: (v) => fmtNum(v, 3) }
+    ]) },
+    'kpi-mort-eng-r': { panel: 'panel-mort-eng', loader: () => loadPanelTrend('mort-eng', 'sitio3', 'RATE_MORTALITY_INPLACE_STAGE', 3, '#e85d5d', [
+      { code: 'RATE_MORTALITY_INPLACE_STAGE', label: 'Mortalidad (%)', fmt: (v) => fmtPct(v) },
+      { code: 'TOTAL_DEATHS_INPLACE', label: 'Total Muertes', fmt: (v) => fmtInt(v) },
+      { code: 'TOTAL_ANIMAL_INPUT_STAGE', label: 'Ingresados', fmt: (v) => fmtInt(v) },
+      { code: 'TOTAL_ANIMAL_OUTPUT_STAGE', label: 'Salidas', fmt: (v) => fmtInt(v) }
+    ]) },
+    'kpi-peso-sal-r': { panel: 'panel-engorde', loader: () => loadEngordePanel() }
+  };
 
-  document.getElementById('kpi-stock').addEventListener('click', function(e) {
-    // Don't toggle if clicking tooltip
-    if (e.target.closest('.kpi-tooltip')) return;
-    const panel = document.getElementById('stock-panel');
-    const card = this;
-    const isOpen = panel.classList.contains('open');
-    panel.classList.toggle('open');
-    card.classList.toggle('expanded');
-    if (!isOpen && !stockPanelLoaded) {
-      loadStockPanel();
-    }
+  // Generic click handler for all expandable cards
+  document.querySelectorAll('.kpi-expandable').forEach(card => {
+    card.addEventListener('click', function(e) {
+      if (e.target.closest('.kpi-tooltip')) return;
+      const cfg = panelMap[this.id];
+      if (!cfg) return;
+      const panel = document.getElementById(cfg.panel);
+      if (!panel) return;
+      const isOpen = panel.classList.contains('open');
+      // Close any other open panel in same kpi-grid
+      const grid = this.closest('.kpi-grid');
+      grid.querySelectorAll('.expand-panel.open').forEach(p => {
+        if (p !== panel) {
+          p.classList.remove('open');
+          const sibCard = grid.querySelector('.kpi-expandable.expanded[id]');
+          if (sibCard && panelMap[sibCard.id] && panelMap[sibCard.id].panel !== cfg.panel) sibCard.classList.remove('expanded');
+        }
+      });
+      // Also close expanded cards in same grid
+      grid.querySelectorAll('.kpi-expandable.expanded').forEach(c => {
+        if (c !== this) c.classList.remove('expanded');
+      });
+      panel.classList.toggle('open');
+      this.classList.toggle('expanded');
+      if (!isOpen && !panelLoaded[cfg.panel]) {
+        panelLoaded[cfg.panel] = true;
+        cfg.loader();
+      }
+    });
   });
+
+  // Generic trend panel loader
+  async function loadPanelTrend(key, site, kpiCode, benchmark, color, subKpis) {
+    const loading = document.getElementById('panel-' + key + '-loading');
+    const content = document.getElementById('panel-' + key + '-content');
+    const chartId = 'panel-' + key + '-chart';
+    const kpisId = 'panel-' + key + '-kpis';
+    try {
+      const months = last6Months();
+      // Trend chart
+      const data = await fetchKpis(site, [kpiCode], months[0].start, months[months.length-1].end, 'year_month');
+      let pts = extractKpiMonthly(data, kpiCode);
+      if (pts.length === 0) {
+        const fallback = [];
+        for (const m of months) {
+          try {
+            const md = await fetchKpis(site, [kpiCode], m.start, m.end, 'farm_id');
+            fallback.push({ month: m.start, label: monthLabel(m.start), value: extractKpiValue(md, kpiCode) });
+          } catch (_) { fallback.push({ month: m.start, label: monthLabel(m.start), value: null }); }
+        }
+        pts = fallback;
+      } else {
+        pts = pts.map(p => ({ ...p, label: monthLabel(p.month) }));
+      }
+      renderLineChart(chartId, pts, benchmark, '', color);
+
+      // Sub-KPIs (6-month period)
+      if (subKpis && subKpis.length > 0) {
+        const codes = subKpis.map(s => s.code);
+        const subData = await fetchKpis(site, codes, months[0].start, months[months.length-1].end, 'farm_id');
+        let html = '';
+        subKpis.forEach(sk => {
+          const val = extractKpiValue(subData, sk.code);
+          html += '<div><div class="mini-kpi"><span class="mk-label">' + sk.label + '</span><span class="mk-val">' + sk.fmt(val) + '</span></div></div>';
+        });
+        document.getElementById(kpisId).innerHTML = html;
+      }
+
+      loading.style.display = 'none';
+      content.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error: ' + e.message;
+      console.error('Panel ' + key + ' error:', e);
+    }
+  }
 
   async function loadStockPanel() {
     const start = monthStart(-5);
@@ -1509,20 +1653,7 @@ out.push({ month: period, value: k.value });
     }
   }
 
-  // ---- ENGORDE PANEL ----
-  let engordePanelLoaded = false;
-
-  document.getElementById('kpi-peso-sal-r').addEventListener('click', function(e) {
-    if (e.target.closest('.kpi-tooltip')) return;
-    const panel = document.getElementById('engorde-panel');
-    const card = this;
-    const isOpen = panel.classList.contains('open');
-    panel.classList.toggle('open');
-    card.classList.toggle('expanded');
-    if (!isOpen && !engordePanelLoaded) {
-      loadEngordePanel();
-    }
-  });
+  // ---- ENGORDE PANEL (loaded by generic system above) ----
 
   async function loadEngordePanel() {
     const loading = document.getElementById('engorde-panel-loading');
