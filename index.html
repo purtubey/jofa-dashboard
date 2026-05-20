@@ -341,14 +341,21 @@ body {
     }
     .engorde-panel.open { display: block; }
 
-    .engorde-chart-area { margin-bottom: 18px; }
-    .engorde-chart-area h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 8px 0; }
-
     .engorde-panel-grid {
       display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;
     }
     @media (max-width: 900px) { .engorde-panel-grid { grid-template-columns: 1fr; } }
     .engorde-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-2); margin: 0 0 12px 0; }
+
+    /* Monthly peso table */
+    .peso-month-row { display: flex; align-items: center; padding: 7px 10px; border-radius: 6px; margin-bottom: 4px; font-size: 13px; }
+    .peso-month-row:nth-child(odd) { background: var(--bg-2); }
+    .peso-month-label { color: var(--text-2); width: 70px; flex-shrink: 0; }
+    .peso-month-bar { flex: 1; height: 18px; background: var(--bg-3); border-radius: 9px; margin: 0 10px; position: relative; overflow: hidden; }
+    .peso-month-fill { height: 100%; border-radius: 9px; transition: width 0.4s ease; }
+    .peso-month-val { width: 70px; text-align: right; font-weight: 600; flex-shrink: 0; }
+    .peso-month-cab { width: 65px; text-align: right; font-size: 11px; color: var(--text-3); flex-shrink: 0; }
+    .peso-month-deficit { width: 80px; text-align: right; font-size: 11px; flex-shrink: 0; }
 
     /* Weight journey bar */
     .weight-journey { background: var(--bg-2); border-radius: 8px; padding: 14px; }
@@ -364,9 +371,6 @@ body {
     .kg-mesa .km-val { font-size: 22px; font-weight: 700; }
     .kg-mesa .km-detail { font-size: 11px; color: var(--text-2); margin-top: 4px; }
 
-    /* Zone chart extras */
-    .zone-danger { fill: rgba(232,93,93,0.08); }
-    .zone-target { fill: rgba(46,204,139,0.08); }
 </style>
 </head>
 <body>
@@ -438,9 +442,9 @@ body {
         <div class="engorde-panel" id="engorde-panel">
           <div class="stock-loading" id="engorde-panel-loading">Cargando perfil de engorde...</div>
           <div id="engorde-panel-content" style="display:none;">
-            <div class="engorde-chart-area">
-              <h4>Peso de Salida - Ultimos 6 Meses (Target: 115 kg)</h4>
-              <div class="chart-box" id="chart-peso-trend" style="min-height:180px;"></div>
+            <div style="margin-bottom:16px;">
+              <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-2);margin:0 0 10px 0;">Peso de Salida Mensual (Target: 115 kg)</h4>
+              <div id="engorde-peso-monthly"></div>
             </div>
             <div class="engorde-panel-grid">
               <div>
@@ -1542,8 +1546,27 @@ out.push({ month: period, value: k.value });
         }
       }
 
-      // Render peso trend chart with colored zones
-      renderPesoTrendChart('chart-peso-trend', pesoMonthly, TARGET_WEIGHT);
+      // Render monthly peso list with mini bars
+      let pesoListHtml = '';
+      pesoMonthly.forEach(m => {
+        if (m.value == null) return;
+        const mv = parseFloat(String(m.value).replace(/\./g, '').replace(',', '.'));
+        if (isNaN(mv)) return;
+        const mc = m.cabezas ? parseFloat(String(m.cabezas).replace(/\./g, '').replace(',', '.')) : 0;
+        const pct = Math.min(100, (mv / (TARGET_WEIGHT * 1.1)) * 100);
+        const color = mv >= TARGET_WEIGHT ? 'var(--green)' : mv >= 100 ? 'var(--yellow)' : 'var(--red)';
+        const deficit = TARGET_WEIGHT - mv;
+        const kgMesaMes = deficit > 0 ? Math.round(deficit * mc) : 0;
+        pesoListHtml += '<div class="peso-month-row">';
+        pesoListHtml += '<span class="peso-month-label">' + m.label + '</span>';
+        pesoListHtml += '<div class="peso-month-bar"><div class="peso-month-fill" style="width:' + pct.toFixed(0) + '%;background:' + color + ';opacity:0.7;"></div></div>';
+        pesoListHtml += '<span class="peso-month-val" style="color:' + color + ';">' + fmtNum(mv, 1) + ' kg</span>';
+        pesoListHtml += '<span class="peso-month-cab">' + fmtInt(mc) + ' cab</span>';
+        pesoListHtml += '<span class="peso-month-deficit" style="color:' + (deficit > 0 ? 'var(--red)' : 'var(--green)') + ';">' + (deficit > 0 ? '-' + fmtInt(kgMesaMes) + ' kg' : '✓ OK') + '</span>';
+        pesoListHtml += '</div>';
+      });
+      if (!pesoListHtml) pesoListHtml = '<div style="color:var(--text-3);font-size:13px;">Sin datos mensuales</div>';
+      document.getElementById('engorde-peso-monthly').innerHTML = pesoListHtml;
 
       // 2) Aggregate KPIs for the period
       const aggKpis = [
@@ -1605,18 +1628,6 @@ out.push({ month: period, value: k.value });
       prodHtml += '<div class="flow-row"><span class="flow-label">Muertos en engorde</span><span class="flow-val out">-' + fmtInt(muertos) + '</span></div>';
       prodHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Kg totales producidos</span><span class="flow-val" style="font-size:15px;color:var(--green);">' + fmtInt(kgTotales) + ' kg</span></div>';
 
-      // Monthly breakdown mini table
-      let mTblHtml = '<div style="margin-top:12px;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Desglose mensual</div>';
-      pesoMonthly.forEach(m => {
-        if (m.value != null) {
-          const mv = parseFloat(String(m.value).replace(/\./g, '').replace(',', '.'));
-          const mc = m.cabezas ? parseFloat(String(m.cabezas).replace(/\./g, '').replace(',', '.')) : 0;
-          const mDef = TARGET_WEIGHT - mv;
-          const mKgMesa = mDef > 0 ? mDef * mc : 0;
-          mTblHtml += '<div class="flow-row"><span class="flow-label">' + m.label + ' (' + fmtInt(mc) + ' cab)</span><span class="flow-val" style="color:' + (mv >= TARGET_WEIGHT ? 'var(--green)' : mv >= 100 ? 'var(--yellow)' : 'var(--red)') + ';">' + fmtNum(mv, 1) + ' kg</span></div>';
-        }
-      });
-      prodHtml += mTblHtml;
       document.getElementById('engorde-produccion').innerHTML = prodHtml;
 
       // --- EFICIENCIA ---
@@ -1645,97 +1656,6 @@ out.push({ month: period, value: k.value });
       loading.textContent = 'Error al cargar perfil: ' + e.message;
       console.error('Engorde panel error:', e);
     }
-  }
-
-  // Custom chart with colored zones for peso de salida
-  function renderPesoTrendChart(containerId, dataPoints, target) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const pts = dataPoints.filter(p => p.value != null && !isNaN(parseFloat(String(p.value).replace(/\./g, '').replace(',', '.'))));
-    if (pts.length === 0) {
-      container.innerHTML = '<div class="table-empty">Sin datos de peso de salida</div>';
-      return;
-    }
-
-    const W = 700, H = 220, PL = 50, PR = 20, PT = 15, PB = 35;
-    const cw = W - PL - PR, ch = H - PT - PB;
-    const DANGER = 100;
-
-    const vals = pts.map(p => parseFloat(String(p.value).replace(/\./g, '').replace(',', '.')));
-    const allVals = [...vals, target, DANGER];
-    let minV = Math.min(...allVals) - 5;
-    let maxV = Math.max(...allVals) + 5;
-
-    function x(i) { return PL + (pts.length > 1 ? i / (pts.length - 1) * cw : cw / 2); }
-    function y(v) { return PT + ch - ((v - minV) / (maxV - minV)) * ch; }
-
-    // Zones
-    let zones = '';
-    // Danger zone: below DANGER
-    const dangerTop = y(DANGER);
-    const dangerBot = y(minV);
-    zones += '<rect x="' + PL + '" y="' + dangerTop + '" width="' + cw + '" height="' + (dangerBot - dangerTop) + '" class="zone-danger" />';
-    // Target zone: above target
-    const targetTop = y(maxV);
-    const targetBot = y(target);
-    zones += '<rect x="' + PL + '" y="' + targetTop + '" width="' + cw + '" height="' + (targetBot - targetTop) + '" class="zone-target" />';
-
-    // Grid
-    let grid = '';
-    const steps = 4;
-    for (let i = 0; i <= steps; i++) {
-      const gy = PT + (ch / steps) * i;
-      const gv = maxV - ((maxV - minV) / steps) * i;
-      grid += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" class="chart-grid" />';
-      grid += '<text x="' + (PL - 8) + '" y="' + (gy + 4) + '" text-anchor="end" class="chart-label">' + Math.round(gv) + '</text>';
-    }
-
-    // Target line
-    const ty = y(target);
-    let bench = '<line x1="' + PL + '" y1="' + ty + '" x2="' + (W - PR) + '" y2="' + ty + '" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.7" />';
-    bench += '<text x="' + (W - PR + 2) + '" y="' + (ty - 4) + '" fill="var(--green)" font-size="10" font-family="Inter,sans-serif">' + target + ' kg</text>';
-
-    // Danger line
-    const dy = y(DANGER);
-    bench += '<line x1="' + PL + '" y1="' + dy + '" x2="' + (W - PR) + '" y2="' + dy + '" stroke="var(--red)" stroke-width="1" stroke-dasharray="4,4" opacity="0.5" />';
-    bench += '<text x="' + (W - PR + 2) + '" y="' + (dy - 4) + '" fill="var(--red)" font-size="9" font-family="Inter,sans-serif" opacity="0.7">Alerta</text>';
-
-    // Line path
-    let path = '';
-    let areaPath = '';
-    pts.forEach((p, i) => {
-      const pv = parseFloat(String(p.value).replace(/\./g, '').replace(',', '.'));
-      const px = x(i), py = y(pv);
-      path += (i === 0 ? 'M ' : ' L ') + px + ' ' + py;
-      areaPath += (i === 0 ? 'M ' : ' L ') + px + ' ' + py;
-    });
-    areaPath += ' L ' + x(pts.length - 1) + ' ' + (PT + ch) + ' L ' + x(0) + ' ' + (PT + ch) + ' Z';
-
-    // Dots with color coding
-    let dots = '';
-    pts.forEach((p, i) => {
-      const pv = parseFloat(String(p.value).replace(/\./g, '').replace(',', '.'));
-      const px = x(i), py = y(pv);
-      const dotColor = pv >= target ? 'var(--green)' : pv >= DANGER ? 'var(--yellow)' : 'var(--red)';
-      dots += '<circle cx="' + px + '" cy="' + py + '" r="5" fill="' + dotColor + '" stroke="var(--bg-1)" stroke-width="2" />';
-      dots += '<text x="' + px + '" y="' + (py - 12) + '" text-anchor="middle" fill="' + dotColor + '" font-size="12" font-weight="600" font-family="Inter,sans-serif">' + fmtNum(pv, 1) + '</text>';
-    });
-
-    // Labels
-    let labels = '';
-    pts.forEach((p, i) => {
-      labels += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" class="chart-label">' + (p.label || '') + '</text>';
-    });
-
-    const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">'
-      + zones + grid + bench
-      + '<path d="' + areaPath + '" fill="var(--blue)" opacity="0.07" />'
-      + '<path d="' + path + '" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round" />'
-      + dots + labels
-      + '</svg>';
-
-    container.innerHTML = svg;
   }
 
   // ---- CONFIG: TEST CONNECTION ----
