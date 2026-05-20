@@ -528,7 +528,34 @@ body {
         </div>
       </div>
     </div>
-    <!-- PSY chart moved inside PSY expandable card above -->
+    <!-- Inventario General -->
+    <div class="section">
+      <div class="section-title">Inventario General</div>
+      <div class="kpi-grid" id="kpi-resumen-inv">
+        <div class="kpi-card kpi-expandable" id="kpi-inv-total"><div class="kpi-label">Inventario Total</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Inventario Total de Animales</div><div class="tt-desc">Suma de todos los cerdos vivos en la granja: lechones en maternidad, recría y engorde, más el plantel reproductor.</div><div class="tt-calc">Calculo: Lechones (Sitio 1) + Recría (Sitio 2) + Engorde (Sitio 3) + Reproductores</div><div class="tt-ref">Ref: Indicador de escala productiva</div></div></div>
+        <!-- Panel Inventario -->
+        <div class="expand-panel" id="panel-inv">
+          <div class="stock-loading" id="panel-inv-loading">Cargando desglose de inventario...</div>
+          <div id="panel-inv-content" style="display:none;">
+            <div class="stock-panel-grid">
+              <div class="donut-wrap">
+                <h4>Distribucion por Sitio</h4>
+                <div id="inv-donut"></div>
+                <div class="donut-legend" id="inv-donut-legend"></div>
+              </div>
+              <div>
+                <h4>Detalle por Sitio</h4>
+                <div id="inv-detail"></div>
+              </div>
+              <div>
+                <h4>Indicadores de Flujo</h4>
+                <div id="inv-flow"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- SERVICIO -->
@@ -1187,6 +1214,28 @@ out.push({ month: period, value: k.value });
       console.error('Current month S3 error:', e);
     }
 
+    // Inventario total (todos los sitios)
+    try {
+      const [invS1, invS2, invS3] = await Promise.all([
+        fetchKpis('sitio1', ['PIGLET_INVENTORY','ACTIVE_SOWS_INVENTORY','ACTIVE_GILTS_INVENTORY','ACTIVE_BOARS_INVENTORY'], start, end, 'farm_id'),
+        fetchKpis('sitio2', ['ANIMAL_INVENTORY'], start, end, 'farm_id'),
+        fetchKpis('sitio3', ['ANIMAL_INVENTORY'], start, end, 'farm_id')
+      ]);
+      const lechones = extractKpiValue(invS1, 'PIGLET_INVENTORY') || 0;
+      const madres = extractKpiValue(invS1, 'ACTIVE_SOWS_INVENTORY') || 0;
+      const primerizas = extractKpiValue(invS1, 'ACTIVE_GILTS_INVENTORY') || 0;
+      const padrillos = extractKpiValue(invS1, 'ACTIVE_BOARS_INVENTORY') || 0;
+      const recria = extractKpiValue(invS2, 'ANIMAL_INVENTORY') || 0;
+      const engorde = extractKpiValue(invS3, 'ANIMAL_INVENTORY') || 0;
+      const totalInv = lechones + madres + primerizas + padrillos + recria + engorde;
+      setKpi('kpi-inv-total', fmtInt(totalInv), null, null, true);
+      // Store for panel use
+      state.inventario = { lechones, madres, primerizas, padrillos, recria, engorde, total: totalInv };
+    } catch (e) {
+      setKpiError('kpi-inv-total', e.message);
+      console.error('Inventario error:', e);
+    }
+
   }
 
   // ---- SERVICIO ----
@@ -1448,7 +1497,8 @@ out.push({ month: period, value: k.value });
       { code: 'TOTAL_ANIMAL_INPUT_STAGE', label: 'Ingresados', fmt: (v) => fmtInt(v) },
       { code: 'TOTAL_ANIMAL_OUTPUT_STAGE', label: 'Salidas', fmt: (v) => fmtInt(v) }
     ]) },
-    'kpi-peso-sal-r': { panel: 'panel-engorde', loader: () => loadEngordePanel() }
+    'kpi-peso-sal-r': { panel: 'panel-engorde', loader: () => loadEngordePanel() },
+    'kpi-inv-total': { panel: 'panel-inv', loader: () => loadInventarioPanel() }
   };
 
   // Generic click handler for all expandable cards
@@ -1527,6 +1577,122 @@ out.push({ month: period, value: k.value });
     }
   }
 
+  // ---- INVENTARIO PANEL ----
+  async function loadInventarioPanel() {
+    const loading = document.getElementById('panel-inv-loading');
+    const content = document.getElementById('panel-inv-content');
+    try {
+      // Use cached data from loadResumen if available, otherwise fetch
+      let inv = state.inventario;
+      if (!inv) {
+        const start = monthStart(-5);
+        const end = today();
+        const [invS1, invS2, invS3] = await Promise.all([
+          fetchKpis('sitio1', ['PIGLET_INVENTORY','ACTIVE_SOWS_INVENTORY','ACTIVE_GILTS_INVENTORY','ACTIVE_BOARS_INVENTORY'], start, end, 'farm_id'),
+          fetchKpis('sitio2', ['ANIMAL_INVENTORY'], start, end, 'farm_id'),
+          fetchKpis('sitio3', ['ANIMAL_INVENTORY'], start, end, 'farm_id')
+        ]);
+        inv = {
+          lechones: extractKpiValue(invS1, 'PIGLET_INVENTORY') || 0,
+          madres: extractKpiValue(invS1, 'ACTIVE_SOWS_INVENTORY') || 0,
+          primerizas: extractKpiValue(invS1, 'ACTIVE_GILTS_INVENTORY') || 0,
+          padrillos: extractKpiValue(invS1, 'ACTIVE_BOARS_INVENTORY') || 0,
+          recria: extractKpiValue(invS2, 'ANIMAL_INVENTORY') || 0,
+          engorde: extractKpiValue(invS3, 'ANIMAL_INVENTORY') || 0
+        };
+        inv.total = inv.lechones + inv.madres + inv.primerizas + inv.padrillos + inv.recria + inv.engorde;
+      }
+
+      // --- DONUT CHART ---
+      const segments = [
+        { label: 'Maternidad (lechones)', value: inv.lechones, color: '#f0c040' },
+        { label: 'Recria (Sitio 2)', value: inv.recria, color: '#a78bfa' },
+        { label: 'Engorde (Sitio 3)', value: inv.engorde, color: '#4f7df5' },
+        { label: 'Reproductores', value: inv.madres + inv.primerizas + inv.padrillos, color: '#2ecc8b' }
+      ];
+      const total = inv.total || 1;
+
+      const R = 70, r = 45, cx = 90, cy = 90;
+      let angle = -90;
+      let paths = '';
+      segments.forEach(seg => {
+        if (seg.value <= 0) return;
+        const pct = seg.value / total;
+        const a1 = angle * Math.PI / 180;
+        const a2 = (angle + pct * 360) * Math.PI / 180;
+        const large = pct > 0.5 ? 1 : 0;
+        const x1o = cx + R * Math.cos(a1), y1o = cy + R * Math.sin(a1);
+        const x2o = cx + R * Math.cos(a2), y2o = cy + R * Math.sin(a2);
+        const x1i = cx + r * Math.cos(a2), y1i = cy + r * Math.sin(a2);
+        const x2i = cx + r * Math.cos(a1), y2i = cy + r * Math.sin(a1);
+        paths += '<path d="M' + x1o + ',' + y1o + ' A' + R + ',' + R + ' 0 ' + large + ' 1 ' + x2o + ',' + y2o + ' L' + x1i + ',' + y1i + ' A' + r + ',' + r + ' 0 ' + large + ' 0 ' + x2i + ',' + y2i + ' Z" fill="' + seg.color + '" opacity="0.85"><title>' + seg.label + ': ' + fmtInt(seg.value) + ' (' + fmtNum(seg.value / total * 100, 1) + '%)</title></path>';
+        angle += pct * 360;
+      });
+      const donutSvg = '<svg viewBox="0 0 180 180" style="width:160px;height:160px;">' + paths
+        + '<text x="' + cx + '" y="' + (cy - 6) + '" text-anchor="middle" fill="var(--text-0)" font-size="20" font-weight="700">' + fmtInt(total) + '</text>'
+        + '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" fill="var(--text-3)" font-size="9">CABEZAS</text>'
+        + '</svg>';
+      document.getElementById('inv-donut').innerHTML = donutSvg;
+
+      // Legend
+      let legendHtml = '';
+      segments.forEach(seg => {
+        const pct = (seg.value / total * 100).toFixed(1);
+        legendHtml += '<div class="donut-legend-item"><span class="dot" style="background:' + seg.color + ';"></span>' + seg.label + '<span class="dl-val">' + fmtInt(seg.value) + ' (' + pct + '%)</span></div>';
+      });
+      document.getElementById('inv-donut-legend').innerHTML = legendHtml;
+
+      // --- DETAIL ---
+      let detHtml = '';
+      detHtml += '<div class="mini-kpi" style="font-weight:600;color:var(--blue);border-bottom:2px solid var(--bg-3);padding-bottom:8px;margin-bottom:4px;"><span class="mk-label" style="color:var(--blue);">SITIO 1 — Maternidad</span><span class="mk-val" style="color:var(--blue);">' + fmtInt(inv.lechones + inv.madres + inv.primerizas + inv.padrillos) + '</span></div>';
+      detHtml += '<div class="mini-kpi"><span class="mk-label">Lechones lactando</span><span class="mk-val">' + fmtInt(inv.lechones) + '</span></div>';
+      detHtml += '<div class="mini-kpi"><span class="mk-label">Madres activas</span><span class="mk-val">' + fmtInt(inv.madres) + '</span></div>';
+      detHtml += '<div class="mini-kpi"><span class="mk-label">Primerizas</span><span class="mk-val">' + fmtInt(inv.primerizas) + '</span></div>';
+      detHtml += '<div class="mini-kpi"><span class="mk-label">Padrillos</span><span class="mk-val">' + fmtInt(inv.padrillos) + '</span></div>';
+      detHtml += '<div class="mini-kpi" style="font-weight:600;color:var(--yellow);border-bottom:2px solid var(--bg-3);border-top:2px solid var(--bg-3);padding:8px 0;margin:8px 0 4px;"><span class="mk-label" style="color:var(--yellow);">SITIO 2 — Recria</span><span class="mk-val" style="color:var(--yellow);">' + fmtInt(inv.recria) + '</span></div>';
+      detHtml += '<div class="mini-kpi"><span class="mk-label">Cerdos en recria (~4.7→29 kg)</span><span class="mk-val">' + fmtInt(inv.recria) + '</span></div>';
+      detHtml += '<div class="mini-kpi" style="font-weight:600;color:#a78bfa;border-bottom:2px solid var(--bg-3);border-top:2px solid var(--bg-3);padding:8px 0;margin:8px 0 4px;"><span class="mk-label" style="color:#a78bfa;">SITIO 3 — Engorde</span><span class="mk-val" style="color:#a78bfa;">' + fmtInt(inv.engorde) + '</span></div>';
+      detHtml += '<div class="mini-kpi"><span class="mk-label">Cerdos en engorde (~29→105 kg)</span><span class="mk-val">' + fmtInt(inv.engorde) + '</span></div>';
+      document.getElementById('inv-detail').innerHTML = detHtml;
+
+      // --- FLOW INDICATORS ---
+      // Fetch recent monthly flow data
+      const months = last6Months();
+      const [flowS2, flowS3] = await Promise.all([
+        fetchKpis('sitio2', ['TOTAL_ANIMAL_INPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_DEATHS_INPLACE','RATE_MORTALITY_INPLACE_STAGE'], months[0].start, months[months.length-1].end, 'farm_id'),
+        fetchKpis('sitio3', ['TOTAL_ANIMAL_INPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_DEATHS_INPLACE','RATE_MORTALITY_INPLACE_STAGE'], months[0].start, months[months.length-1].end, 'farm_id')
+      ]);
+      const s2in = extractKpiValue(flowS2, 'TOTAL_ANIMAL_INPUT_STAGE') || 0;
+      const s2out = extractKpiValue(flowS2, 'TOTAL_ANIMAL_OUTPUT_STAGE') || 0;
+      const s2dead = extractKpiValue(flowS2, 'TOTAL_DEATHS_INPLACE') || 0;
+      const s2mort = extractKpiValue(flowS2, 'RATE_MORTALITY_INPLACE_STAGE');
+      const s3in = extractKpiValue(flowS3, 'TOTAL_ANIMAL_INPUT_STAGE') || 0;
+      const s3out = extractKpiValue(flowS3, 'TOTAL_ANIMAL_OUTPUT_STAGE') || 0;
+      const s3dead = extractKpiValue(flowS3, 'TOTAL_DEATHS_INPLACE') || 0;
+      const s3mort = extractKpiValue(flowS3, 'RATE_MORTALITY_INPLACE_STAGE');
+
+      let flowHtml = '<div style="font-size:11px;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Flujo ultimos 6 meses</div>';
+      flowHtml += '<div class="mini-kpi"><span class="mk-label">Ingresados a Recria</span><span class="mk-val" style="color:var(--green);">+' + fmtInt(s2in) + '</span></div>';
+      flowHtml += '<div class="mini-kpi"><span class="mk-label">Salidos de Recria</span><span class="mk-val">' + fmtInt(s2out) + '</span></div>';
+      flowHtml += '<div class="mini-kpi"><span class="mk-label">Muertes Recria</span><span class="mk-val" style="color:var(--red);">-' + fmtInt(s2dead) + ' (' + fmtPct(s2mort) + ')</span></div>';
+      flowHtml += '<div style="height:8px;"></div>';
+      flowHtml += '<div class="mini-kpi"><span class="mk-label">Ingresados a Engorde</span><span class="mk-val" style="color:var(--green);">+' + fmtInt(s3in) + '</span></div>';
+      flowHtml += '<div class="mini-kpi"><span class="mk-label">Salidos de Engorde</span><span class="mk-val">' + fmtInt(s3out) + '</span></div>';
+      flowHtml += '<div class="mini-kpi"><span class="mk-label">Muertes Engorde</span><span class="mk-val" style="color:var(--red);">-' + fmtInt(s3dead) + ' (' + fmtPct(s3mort) + ')</span></div>';
+      flowHtml += '<div style="height:8px;border-top:2px solid var(--bg-3);margin-top:8px;"></div>';
+      const totalMuertes = s2dead + s3dead;
+      flowHtml += '<div class="mini-kpi"><span class="mk-label" style="font-weight:600;">Total muertes post-destete</span><span class="mk-val" style="color:var(--red);font-size:15px;">-' + fmtInt(totalMuertes) + '</span></div>';
+      document.getElementById('inv-flow').innerHTML = flowHtml;
+
+      loading.style.display = 'none';
+      content.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error al cargar inventario: ' + e.message;
+      console.error('Inventario panel error:', e);
+    }
+  }
+
+  // ---- STOCK MADRES PANEL ----
   async function loadStockPanel() {
     const start = monthStart(-5);
     const end = today();
