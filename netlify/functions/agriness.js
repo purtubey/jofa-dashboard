@@ -243,10 +243,10 @@ exports.handler = async (event) => {
         break;
       }
       case 'partos':
-        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list', params, authHeaders);
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list/' + ((params && params.gender) || 'female'), params, authHeaders);
         break;
       case 'destetes':
-        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list', params, authHeaders);
+        result = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list/' + ((params && params.gender) || 'female'), params, authHeaders);
         break;
       case 'eventos':
         result = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/events', params, authHeaders);
@@ -331,10 +331,10 @@ exports.handler = async (event) => {
             retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/mating-list/' + ((params && params.gender) || 'female'), params, freshHeaders);
             break;
           case 'partos':
-            retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list', params, freshHeaders);
+            retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list/' + ((params && params.gender) || 'female'), params, freshHeaders);
             break;
           case 'destetes':
-            retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list', params, freshHeaders);
+            retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list/' + ((params && params.gender) || 'female'), params, freshHeaders);
             break;
           case 'eventos':
             retryResult = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/events', params, freshHeaders);
@@ -372,8 +372,8 @@ exports.handler = async (event) => {
 
         const sitio1Paths = {
           'servicios': '/sitio1-swine-default/v1/swine/reproductive/mating-list/' + ((params && params.gender) || 'female'),
-          'partos': '/sitio1-swine-default/v1/swine/reproductive/farrowing-list',
-          'destetes': '/sitio1-swine-default/v1/swine/reproductive/weaning-list',
+          'partos': '/sitio1-swine-default/v1/swine/reproductive/farrowing-list/' + ((params && params.gender) || 'female'),
+          'destetes': '/sitio1-swine-default/v1/swine/reproductive/weaning-list/' + ((params && params.gender) || 'female'),
         };
         const retryResult = await makeRequest('POST', sitio1Paths[action], params, freshHeaders);
         console.log('Retry response for', action, ':', retryResult.status, JSON.stringify(retryResult.data).substring(0, 200));
