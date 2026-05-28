@@ -221,6 +221,7 @@ exports.handler = async (event) => {
     let result;
 
     switch (action) {
+      case 'health':
       case 'farms':
         result = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, authHeaders);
         break;
@@ -250,6 +251,14 @@ exports.handler = async (event) => {
       case 'eventos':
         result = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/events', params, authHeaders);
         break;
+      case 'raw': {
+        // Exploratory: hit arbitrary sitio1 path
+        const rawPath = (params && params.path) || '';
+        const rawMethod = (params && params.method) || 'POST';
+        const rawBody = (params && params.body) || {};
+        result = await makeRequest(rawMethod, rawPath, rawBody, authHeaders);
+        break;
+      }
       default:
         return { statusCode: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ error: 'Accion no reconocida: ' + action }) };
@@ -257,9 +266,9 @@ exports.handler = async (event) => {
 
     console.log('API response for', action, ':', result.status, JSON.stringify(result.data).substring(0, 200));
 
-    // Retry con token refresh si 403 en KPI endpoints
-    if (result.status === 403 && isKpiAction) {
-      console.log('403 on KPI endpoint, clearing cached tokens and retrying...');
+    // Retry con token refresh si 401 o 403 en KPI endpoints
+    if ((result.status === 403 || result.status === 401) && isKpiAction) {
+      console.log(result.status, 'on KPI endpoint, clearing cached tokens and retrying...');
       kpiToken = null;
       kpiTokenExpiry = 0;
       wso2Token = null;
@@ -284,7 +293,7 @@ exports.handler = async (event) => {
         };
         const retryResult = await makeRequest('POST', kpiPaths[action], params, freshKpiHeaders);
         console.log('Retry response for', action, ':', retryResult.status, JSON.stringify(retryResult.data).substring(0, 200));
-        if (retryResult.status !== 403) {
+        if (retryResult.status !== 403 && retryResult.status !== 401) {
           return {
             statusCode: retryResult.status,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -292,7 +301,57 @@ exports.handler = async (event) => {
           };
         }
       } catch (retryErr) {
-        console.error('Retry failed:', retryErr.message);
+        console.error('KPI retry failed:', retryErr.message);
+      }
+    }
+
+    // Retry con token refresh si 401 en cualquier endpoint (token WSO2 expirado/invalidado)
+    if (result.status === 401 && !isKpiAction) {
+      console.log('401 on', action, '- clearing ALL cached tokens and retrying...');
+      wso2Token = null;
+      wso2TokenExpiry = 0;
+      s4Token = null;
+      s4TokenExpiry = 0;
+      try {
+        const freshGw = await getWso2Token();
+        let freshS4 = null;
+        try { freshS4 = await getS4Token(); } catch (err) { console.error('S4 re-auth failed:', err.message); }
+        const freshHeaders = { 'Authorization': 'Bearer ' + freshGw };
+        if (freshS4) freshHeaders['token'] = freshS4;
+        console.log('Retrying', action, 'with fresh WSO2+S4 tokens');
+
+        // Rebuild the request for the current action
+        let retryResult;
+        switch (action) {
+          case 'health':
+          case 'farms':
+            retryResult = await makeRequest('GET', '/sitio1-swine-default/api/v1/farms', null, freshHeaders);
+            break;
+          case 'servicios':
+            retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/mating-list/' + ((params && params.gender) || 'female'), params, freshHeaders);
+            break;
+          case 'partos':
+            retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/farrowing-list', params, freshHeaders);
+            break;
+          case 'destetes':
+            retryResult = await makeRequest('POST', '/sitio1-swine-default/v1/swine/reproductive/weaning-list', params, freshHeaders);
+            break;
+          case 'eventos':
+            retryResult = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/events', params, freshHeaders);
+            break;
+          default:
+            retryResult = null;
+        }
+        if (retryResult && retryResult.status !== 401) {
+          console.log('401 retry succeeded for', action, ':', retryResult.status);
+          return {
+            statusCode: retryResult.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(retryResult.data),
+          };
+        }
+      } catch (retryErr) {
+        console.error('401 retry failed:', retryErr.message);
       }
     }
 
