@@ -1208,14 +1208,18 @@ out.push({ month: period, value: k.value });
       console.error('Current month S1 error:', e);
     }
 
-    // Engorde KPIs (6 meses)
+    // Engorde KPIs (6 meses) — GDP calculado manual: (pesoOut - pesoIn) / dias
     let sixM3 = {};
-    const kpiCodes3 = ['DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE'];
+    const kpiCodes3 = ['FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'];
     try {
       const data3 = await fetchKpis('sitio3', kpiCodes3, start, end, 'farm_id');
       const v3 = (code) => extractKpiValue(data3, code);
       kpiCodes3.forEach(c => { sixM3[c] = v3(c); });
-      setKpi('kpi-gdp-r', fmtNum(v3('DAILY_WEIGHT_GAIN_STAGE'), 3), BENCHMARKS.GDP, 'Bench', true, ' kg');
+      // GDP manual = (peso salida - peso entrada) / dias en fase
+      const gdp6m = (v3('WAVERAGE_WEIGHT_OUTPUT_STAGE') && v3('WAVERAGE_WEIGHT_INPUT_STAGE') && v3('WAVERAGE_DAYS_IN_STAGE_STAGE'))
+        ? (v3('WAVERAGE_WEIGHT_OUTPUT_STAGE') - v3('WAVERAGE_WEIGHT_INPUT_STAGE')) / v3('WAVERAGE_DAYS_IN_STAGE_STAGE') : null;
+      sixM3['_GDP_CALC'] = gdp6m;
+      setKpi('kpi-gdp-r', fmtNum(gdp6m, 3), BENCHMARKS.GDP, 'Bench', true, ' kg');
       setKpi('kpi-conv-r', fmtNum(v3('FEED_CONVERSION_RATIO_STAGE'), 2), BENCHMARKS.FEED_CONV, 'Bench', false);
       setKpi('kpi-mort-eng-r', fmtPct(v3('RATE_MORTALITY_INPLACE_STAGE')), 3, 'Bench', false, '%');
       setKpi('kpi-peso-sal-r', fmtNum(v3('WAVERAGE_WEIGHT_OUTPUT_STAGE'), 1) + ' kg', BENCHMARKS.SLAUGHTER_WT, 'Bench', true, ' kg');
@@ -1227,7 +1231,9 @@ out.push({ month: period, value: k.value });
     try {
       const curData3 = await fetchKpis('sitio3', kpiCodes3, curStart, curEnd, 'farm_id');
       const cv3 = (code) => extractKpiValue(curData3, code);
-      setKpiCurrent('kpi-gdp-r', fmtNum(cv3('DAILY_WEIGHT_GAIN_STAGE'), 3), sixM3['DAILY_WEIGHT_GAIN_STAGE'], true, ' kg');
+      const gdpCur = (cv3('WAVERAGE_WEIGHT_OUTPUT_STAGE') && cv3('WAVERAGE_WEIGHT_INPUT_STAGE') && cv3('WAVERAGE_DAYS_IN_STAGE_STAGE'))
+        ? (cv3('WAVERAGE_WEIGHT_OUTPUT_STAGE') - cv3('WAVERAGE_WEIGHT_INPUT_STAGE')) / cv3('WAVERAGE_DAYS_IN_STAGE_STAGE') : null;
+      setKpiCurrent('kpi-gdp-r', fmtNum(gdpCur, 3), sixM3['_GDP_CALC'], true, ' kg');
       setKpiCurrent('kpi-conv-r', fmtNum(cv3('FEED_CONVERSION_RATIO_STAGE'), 2), sixM3['FEED_CONVERSION_RATIO_STAGE'], false);
       setKpiCurrent('kpi-mort-eng-r', fmtPct(cv3('RATE_MORTALITY_INPLACE_STAGE')), sixM3['RATE_MORTALITY_INPLACE_STAGE'], false, '%');
       setKpiCurrent('kpi-peso-sal-r', fmtNum(cv3('WAVERAGE_WEIGHT_OUTPUT_STAGE'), 1) + ' kg', sixM3['WAVERAGE_WEIGHT_OUTPUT_STAGE'], true, ' kg');
@@ -1427,13 +1433,15 @@ out.push({ month: period, value: k.value });
     const end = today();
 
     try {
-      const kpis = ['DAILY_WEIGHT_GAIN_STAGE','FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_ANIMAL_INPUT_STAGE'];
+      const kpis = ['FEED_CONVERSION_RATIO_STAGE','RATE_MORTALITY_INPLACE_STAGE','WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_ANIMAL_INPUT_STAGE'];
       const data = await fetchKpis('sitio3', kpis, start, end, 'farm_id');
       const v = (code) => extractKpiValue(data, code);
-      setKpi('kpi-gdp-e', fmtNum(v('DAILY_WEIGHT_GAIN_STAGE'), 3), BENCHMARKS.GDP, 'Bench', true, ' kg');
+      // GDP manual
+      const gdpEng = (v('WAVERAGE_WEIGHT_OUTPUT_STAGE') && v('WAVERAGE_WEIGHT_INPUT_STAGE') && v('WAVERAGE_DAYS_IN_STAGE_STAGE'))
+        ? (v('WAVERAGE_WEIGHT_OUTPUT_STAGE') - v('WAVERAGE_WEIGHT_INPUT_STAGE')) / v('WAVERAGE_DAYS_IN_STAGE_STAGE') : null;
+      setKpi('kpi-gdp-e', fmtNum(gdpEng, 3), BENCHMARKS.GDP, 'Bench', true, ' kg');
       setKpi('kpi-conv-e', fmtNum(v('FEED_CONVERSION_RATIO_STAGE'), 2), BENCHMARKS.FEED_CONV, 'Bench', false);
-      // Input weight: we just show input count as reference
-      setKpi('kpi-peso-ent', fmtInt(v('TOTAL_ANIMAL_INPUT_STAGE')) + ' cab', null, null, true);
+      setKpi('kpi-peso-ent', fmtNum(v('WAVERAGE_WEIGHT_INPUT_STAGE'), 1) + ' kg (' + fmtInt(v('TOTAL_ANIMAL_INPUT_STAGE')) + ' cab)', null, null, true);
       setKpi('kpi-peso-sal-e', fmtNum(v('WAVERAGE_WEIGHT_OUTPUT_STAGE'), 1) + ' kg', BENCHMARKS.SLAUGHTER_WT, 'Bench', true, ' kg');
       setKpi('kpi-mort-e', fmtPct(v('RATE_MORTALITY_INPLACE_STAGE')), 3, 'Bench', false, '%');
       setKpi('kpi-tot-sal', fmtInt(v('TOTAL_ANIMAL_OUTPUT_STAGE')), null, null, true);
@@ -1465,6 +1473,26 @@ out.push({ month: period, value: k.value });
     const months = last6Months();
     const startAll = months[0].start;
     const endAll = months[months.length - 1].end;
+
+    // GDP trend chart — calcula GDP manual por mes: (pesoOut - pesoIn) / dias
+    async function loadGdpTrendChart(containerId, benchmark, color) {
+      try {
+        const gdpKpis = ['WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'];
+        const data = await fetchKpis('sitio3', gdpKpis, startAll, endAll, 'reference_date');
+        const monthly = (data && data.data) ? data.data : [];
+        const pts = monthly.map(m => {
+          const k = m.kpis;
+          const gdp = (k.WAVERAGE_WEIGHT_OUTPUT_STAGE && k.WAVERAGE_WEIGHT_INPUT_STAGE && k.WAVERAGE_DAYS_IN_STAGE_STAGE)
+            ? (k.WAVERAGE_WEIGHT_OUTPUT_STAGE - k.WAVERAGE_WEIGHT_INPUT_STAGE) / k.WAVERAGE_DAYS_IN_STAGE_STAGE : null;
+          return { month: m.key + '-01', label: monthLabel(m.key + '-01'), value: gdp };
+        });
+        renderLineChart(containerId, pts, benchmark, '', color);
+      } catch (e) {
+        const c = document.getElementById(containerId);
+        const title = c ? c.querySelector('.chart-title') : null;
+        if (c) c.innerHTML = (title ? '<div class="chart-title">' + title.textContent + '</div>' : '') + '<div class="table-empty">Error: ' + e.message + '</div>';
+      }
+    }
 
     async function loadTrendChart(containerId, site, kpiCode, benchmark, color) {
       try {
@@ -1500,7 +1528,7 @@ out.push({ month: period, value: k.value });
       loadTrendChart('chart-ind-tp', 'sitio1', 'FARROWING_RATE', BENCHMARKS.FARROWING_RATE, '#4f7df5'),
       loadTrendChart('chart-ind-nv', 'sitio1', 'AVERAGE_BORN_ALIVE', BENCHMARKS.BORN_ALIVE, '#2ecc8b'),
       loadTrendChart('chart-ind-mpd', 'sitio1', 'RATE_WEANING_PIG_DEATHS', BENCHMARKS.PRE_WEAN_MORT, '#e85d5d'),
-      loadTrendChart('chart-ind-gdp', 'sitio3', 'DAILY_WEIGHT_GAIN_STAGE', BENCHMARKS.GDP, '#2ecc8b'),
+      loadGdpTrendChart('chart-ind-gdp', BENCHMARKS.GDP, '#2ecc8b'),
       loadTrendChart('chart-ind-conv', 'sitio3', 'FEED_CONVERSION_RATIO_STAGE', BENCHMARKS.FEED_CONV, '#f0c040')
     ]);
   }
@@ -1535,16 +1563,11 @@ out.push({ month: period, value: k.value });
       { code: 'AVERAGE_WMI_DAYS', label: 'Destete-Cubricion (dias)', fmt: (v) => fmtNum(v, 1) },
       { code: 'RATE_HEAT_REPETITION', label: 'Repeticion Celo (%)', fmt: (v) => fmtPct(v) }
     ]) },
-    'kpi-gdp-r': { panel: 'panel-gdp', loader: () => loadPanelTrend('gdp', 'sitio3', 'DAILY_WEIGHT_GAIN_STAGE', BENCHMARKS.GDP, '#2ecc8b', [
-      { code: 'DAILY_WEIGHT_GAIN_STAGE', label: 'GDP (kg/dia)', fmt: (v) => fmtNum(v, 3) },
-      { code: 'WAVERAGE_WEIGHT_INPUT_STAGE', label: 'Peso Entrada (kg)', fmt: (v) => fmtNum(v, 1) },
-      { code: 'WAVERAGE_WEIGHT_OUTPUT_STAGE', label: 'Peso Salida (kg)', fmt: (v) => fmtNum(v, 1) },
-      { code: 'WAVERAGE_DAYS_IN_STAGE_STAGE', label: 'Dias en Engorde', fmt: (v) => fmtNum(v, 0) }
-    ]) },
+    'kpi-gdp-r': { panel: 'panel-gdp', loader: () => loadGdpPanel() },
     'kpi-conv-r': { panel: 'panel-conv', loader: () => loadPanelTrend('conv', 'sitio3', 'FEED_CONVERSION_RATIO_STAGE', BENCHMARKS.FEED_CONV, '#f0c040', [
       { code: 'FEED_CONVERSION_RATIO_STAGE', label: 'Conversion', fmt: (v) => fmtNum(v, 2) },
       { code: 'TOTAL_FEED_PER_ANIMAL_STAGE', label: 'Alimento/Animal (kg)', fmt: (v) => fmtNum(v, 1) },
-      { code: 'DAILY_WEIGHT_GAIN_STAGE', label: 'GDP (kg/dia)', fmt: (v) => fmtNum(v, 3) }
+      { code: 'WAVERAGE_WEIGHT_OUTPUT_STAGE', label: 'Peso Salida (kg)', fmt: (v) => fmtNum(v, 1) }
     ]) },
     'kpi-mort-eng-r': { panel: 'panel-mort-eng', loader: () => loadPanelTrend('mort-eng', 'sitio3', 'RATE_MORTALITY_INPLACE_STAGE', 3, '#e85d5d', [
       { code: 'RATE_MORTALITY_INPLACE_STAGE', label: 'Mortalidad (%)', fmt: (v) => fmtPct(v) },
@@ -1630,6 +1653,48 @@ out.push({ month: period, value: k.value });
     } catch (e) {
       loading.textContent = 'Error: ' + e.message;
       console.error('Panel ' + key + ' error:', e);
+    }
+  }
+
+  // ---- GDP PANEL (manual calculation, replaces broken DAILY_WEIGHT_GAIN_STAGE) ----
+  async function loadGdpPanel() {
+    const loading = document.getElementById('panel-gdp-loading');
+    const content = document.getElementById('panel-gdp-content');
+    const chartId = 'panel-gdp-chart';
+    const kpisId = 'panel-gdp-kpis';
+    try {
+      const gdpKpis = ['WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'];
+      const months = last6Months();
+      // Fetch monthly data
+      const data = await fetchKpis('sitio3', gdpKpis, months[0].start, months[months.length-1].end, 'reference_date');
+      const monthly = (data && data.data) ? data.data : [];
+      const pts = monthly.map(m => {
+        const k = m.kpis;
+        const gdp = (k.WAVERAGE_WEIGHT_OUTPUT_STAGE && k.WAVERAGE_WEIGHT_INPUT_STAGE && k.WAVERAGE_DAYS_IN_STAGE_STAGE)
+          ? (k.WAVERAGE_WEIGHT_OUTPUT_STAGE - k.WAVERAGE_WEIGHT_INPUT_STAGE) / k.WAVERAGE_DAYS_IN_STAGE_STAGE : null;
+        return { month: m.key + '-01', label: monthLabel(m.key + '-01'), value: gdp };
+      });
+      renderLineChart(chartId, pts, BENCHMARKS.GDP, '', '#2ecc8b');
+
+      // Sub-KPIs: aggregate 6 months
+      const subData = await fetchKpis('sitio3', ['WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'], months[0].start, months[months.length-1].end, 'farm_id');
+      const pesoOut = extractKpiValue(subData, 'WAVERAGE_WEIGHT_OUTPUT_STAGE');
+      const pesoIn = extractKpiValue(subData, 'WAVERAGE_WEIGHT_INPUT_STAGE');
+      const diasFase = extractKpiValue(subData, 'WAVERAGE_DAYS_IN_STAGE_STAGE');
+      const gdpAgg = (pesoOut && pesoIn && diasFase) ? (pesoOut - pesoIn) / diasFase : null;
+
+      let html = '';
+      html += '<div><div class="mini-kpi"><span class="mk-label">GDP (kg/dia)</span><span class="mk-val">' + fmtNum(gdpAgg, 3) + '</span></div></div>';
+      html += '<div><div class="mini-kpi"><span class="mk-label">Peso Entrada (kg)</span><span class="mk-val">' + fmtNum(pesoIn, 1) + '</span></div></div>';
+      html += '<div><div class="mini-kpi"><span class="mk-label">Peso Salida (kg)</span><span class="mk-val">' + fmtNum(pesoOut, 1) + '</span></div></div>';
+      html += '<div><div class="mini-kpi"><span class="mk-label">Dias en Engorde</span><span class="mk-val">' + fmtNum(diasFase, 0) + '</span></div></div>';
+      document.getElementById(kpisId).innerHTML = html;
+
+      loading.style.display = 'none';
+      content.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error: ' + e.message;
+      console.error('GDP panel error:', e);
     }
   }
 
@@ -2065,7 +2130,6 @@ out.push({ month: period, value: k.value });
       const allS3Kpis = [
         'WAVERAGE_WEIGHT_OUTPUT_STAGE',   // Peso medio de salida
         'WAVERAGE_WEIGHT_INPUT_STAGE',    // Peso medio de entrada
-        'DAILY_WEIGHT_GAIN_STAGE',        // G.P.D. medio
         'FEED_CONVERSION_RATIO_STAGE',    // Conversion alimenticia
         'TOTAL_ANIMAL_OUTPUT_STAGE',      // Salidas totales
         'TOTAL_ANIMAL_INPUT_STAGE',       // Entradas totales
@@ -2081,11 +2145,15 @@ out.push({ month: period, value: k.value });
         try {
           const md = await fetchKpis('sitio3', allS3Kpis, m.start, m.end, 'farm_id');
           const ev = (c) => extractKpiValue(md, c);
+          const _poOut = ev('WAVERAGE_WEIGHT_OUTPUT_STAGE');
+          const _poIn = ev('WAVERAGE_WEIGHT_INPUT_STAGE');
+          const _dias = ev('WAVERAGE_DAYS_IN_STAGE_STAGE');
+          const _gdpCalc = (_poOut && _poIn && _dias && _dias > 0) ? (_poOut - _poIn) / _dias : null;
           pesoMonthly.push({
             month: m.start, label: monthLabel(m.start),
-            pesoOut: ev('WAVERAGE_WEIGHT_OUTPUT_STAGE'),
-            pesoIn: ev('WAVERAGE_WEIGHT_INPUT_STAGE'),
-            gdp: ev('DAILY_WEIGHT_GAIN_STAGE'),
+            pesoOut: _poOut,
+            pesoIn: _poIn,
+            gdp: _gdpCalc,
             conv: ev('FEED_CONVERSION_RATIO_STAGE'),
             cabOut: ev('TOTAL_ANIMAL_OUTPUT_STAGE'),
             cabIn: ev('TOTAL_ANIMAL_INPUT_STAGE'),
