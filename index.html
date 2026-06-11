@@ -318,10 +318,20 @@ body {
     /* Flow stats */
     .flow-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--bg-2); font-size: 13px; }
     .flow-row:last-child { border-bottom: none; }
+    .flow-row.clickable { cursor: pointer; border-radius: 4px; padding: 6px 6px; margin: 0 -6px; transition: background 0.15s; }
+    .flow-row.clickable:hover { background: var(--bg-2); }
+    .flow-row.clickable .flow-label::after { content: ' ▸'; font-size: 9px; color: var(--text-3); }
+    .flow-row.clickable.expanded .flow-label::after { content: ' ▾'; }
     .flow-label { color: var(--text-2); }
     .flow-val { font-weight: 600; color: var(--text-0); }
     .flow-val.in { color: var(--green); }
     .flow-val.out { color: var(--red); }
+    .flow-detail { display: none; background: var(--bg-1); border-radius: 6px; padding: 8px; margin: 4px 0 8px 0; font-size: 11px; max-height: 200px; overflow-y: auto; }
+    .flow-detail.open { display: block; }
+    .flow-detail table { width: 100%; border-collapse: collapse; }
+    .flow-detail th { color: var(--text-3); text-align: left; padding: 3px 6px; font-weight: 500; border-bottom: 1px solid var(--bg-3); }
+    .flow-detail td { padding: 3px 6px; color: var(--text-1); border-bottom: 1px solid var(--bg-2); }
+    .flow-detail td:last-child { text-align: right; font-weight: 600; }
 
     /* Mini KPI row */
     .mini-kpi { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--bg-2); font-size: 13px; }
@@ -1849,6 +1859,68 @@ out.push({ month: period, value: k.value });
     }
   }
 
+  // ---- FLOW DETAIL (clickable rows in Stock Madres) ----
+  const flowDetailCache = {};
+  window.toggleFlowDetail = async function(rowEl, kpiCodesStr, startDate, endDate) {
+    const kpiCodes = kpiCodesStr.split(',');
+    const detailId = 'fd-' + kpiCodes.join('_');
+    const detailEl = document.getElementById(detailId);
+    if (!detailEl) return;
+
+    // Toggle open/close
+    if (detailEl.classList.contains('open')) {
+      detailEl.classList.remove('open');
+      rowEl.classList.remove('expanded');
+      return;
+    }
+    rowEl.classList.add('expanded');
+    detailEl.classList.add('open');
+    detailEl.innerHTML = '<span style="color:var(--text-3);">Cargando fechas...</span>';
+
+    // Check cache
+    const cacheKey = kpiCodesStr + startDate + endDate;
+    if (flowDetailCache[cacheKey]) {
+      detailEl.innerHTML = flowDetailCache[cacheKey];
+      return;
+    }
+
+    try {
+      const data = await fetchKpis('sitio1', kpiCodes, startDate, endDate, 'reference_date', 'year_month_day');
+      const allDays = ((data && data.data) ? data.data : []).reverse();
+      // Sum all KPIs for each day and filter non-zero
+      const days = allDays.filter(d => {
+        let total = 0;
+        kpiCodes.forEach(k => { total += (d.kpis[k] || 0); });
+        return total > 0;
+      });
+
+      if (days.length === 0) {
+        const html = '<span style="color:var(--text-3);">Sin movimientos individuales en el periodo.</span>';
+        flowDetailCache[cacheKey] = html;
+        detailEl.innerHTML = html;
+        return;
+      }
+
+      const dayNames = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+      const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      let html = '<table><thead><tr><th>Fecha</th><th style="text-align:right;">Cantidad</th></tr></thead><tbody>';
+      days.forEach(d => {
+        const p = d.key.split('-');
+        const dt = new Date(+p[0], +p[1]-1, +p[2]);
+        const label = dayNames[dt.getDay()] + ' ' + parseInt(p[2]) + ' ' + monthNames[+p[1]-1] + ' ' + p[0];
+        let val = 0;
+        kpiCodes.forEach(k => { val += (d.kpis[k] || 0); });
+        html += '<tr><td>' + label + '</td><td style="text-align:right;">' + fmtInt(val) + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      html += '<div style="color:var(--text-3);font-size:10px;margin-top:4px;">' + days.length + ' eventos en el periodo</div>';
+      flowDetailCache[cacheKey] = html;
+      detailEl.innerHTML = html;
+    } catch (e) {
+      detailEl.innerHTML = '<span style="color:var(--red);">Error: ' + e.message + '</span>';
+    }
+  };
+
   // ---- STOCK MADRES PANEL ----
   async function loadStockPanel() {
     const start = monthStart(-5);
@@ -1936,11 +2008,15 @@ out.push({ month: period, value: k.value });
       const totalOut = ventasG + ventasS + muertasS + muertasG;
 
       let flowHtml = '';
-      flowHtml += '<div class="flow-row"><span class="flow-label">Compras primerizas</span><span class="flow-val in">+' + fmtInt(comprasG) + '</span></div>';
-      flowHtml += '<div class="flow-row"><span class="flow-label">Compras hembras</span><span class="flow-val in">+' + fmtInt(comprasS) + '</span></div>';
+      flowHtml += '<div class="flow-row clickable" onclick="toggleFlowDetail(this,\'TOTAL_PURCHASES_GILTS\',\'' + start + '\',\'' + end + '\')"><span class="flow-label">Compras primerizas</span><span class="flow-val in">+' + fmtInt(comprasG) + '</span></div>';
+      flowHtml += '<div class="flow-detail" id="fd-TOTAL_PURCHASES_GILTS"></div>';
+      flowHtml += '<div class="flow-row clickable" onclick="toggleFlowDetail(this,\'TOTAL_PURCHASES_SOWS\',\'' + start + '\',\'' + end + '\')"><span class="flow-label">Compras hembras</span><span class="flow-val in">+' + fmtInt(comprasS) + '</span></div>';
+      flowHtml += '<div class="flow-detail" id="fd-TOTAL_PURCHASES_SOWS"></div>';
       flowHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Total entradas</span><span class="flow-val in" style="font-size:15px;">+' + fmtInt(totalIn) + '</span></div>';
-      flowHtml += '<div class="flow-row" style="margin-top:10px;"><span class="flow-label">Ventas</span><span class="flow-val out">-' + fmtInt(ventasG + ventasS) + '</span></div>';
-      flowHtml += '<div class="flow-row"><span class="flow-label">Muertes</span><span class="flow-val out">-' + fmtInt(muertasS + muertasG) + '</span></div>';
+      flowHtml += '<div class="flow-row clickable" style="margin-top:10px;" onclick="toggleFlowDetail(this,\'TOTAL_SALES_SOWS,TOTAL_SALES_GILTS\',\'' + start + '\',\'' + end + '\')"><span class="flow-label">Ventas</span><span class="flow-val out">-' + fmtInt(ventasG + ventasS) + '</span></div>';
+      flowHtml += '<div class="flow-detail" id="fd-TOTAL_SALES_SOWS_TOTAL_SALES_GILTS"></div>';
+      flowHtml += '<div class="flow-row clickable" onclick="toggleFlowDetail(this,\'TOTAL_DEATHS_ACTIVE_SOW,TOTAL_DEATHS_ACTIVE_GILTS\',\'' + start + '\',\'' + end + '\')"><span class="flow-label">Muertes</span><span class="flow-val out">-' + fmtInt(muertasS + muertasG) + '</span></div>';
+      flowHtml += '<div class="flow-detail" id="fd-TOTAL_DEATHS_ACTIVE_SOW_TOTAL_DEATHS_ACTIVE_GILTS"></div>';
       flowHtml += '<div class="flow-row"><span class="flow-label">Descartes pendientes</span><span class="flow-val" style="color:var(--yellow);">' + fmtInt(descartesS + descartesG) + '</span></div>';
       flowHtml += '<div class="flow-row" style="border-top:2px solid var(--bg-3);padding-top:8px;"><span class="flow-label" style="font-weight:600;">Total salidas</span><span class="flow-val out" style="font-size:15px;">-' + fmtInt(totalOut) + '</span></div>';
       const net = totalIn - totalOut;
