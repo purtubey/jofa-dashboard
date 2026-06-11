@@ -527,12 +527,12 @@ body {
           </div>
         </div>
 
-        <div class="kpi-card kpi-expandable" id="kpi-ult-entrega"><div class="kpi-label">Ultima Entrega</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-sub" id="kpi-ult-entrega-sub" style="font-size:11px;color:var(--text-2);margin-top:2px;"></div><div class="kpi-tooltip"><div class="tt-title">Última Entrega Registrada</div><div class="tt-desc">Peso promedio de la última entrega (salida) de cerdos terminados registrada en el sistema, con fecha y cabezas.</div><div class="tt-calc">Calculo: Peso promedio ponderado de salida del último mes con salidas registradas en Sitio 3.</div><div class="tt-ref">Ref: Objetivo JOFA: 115 kg</div></div></div>
+        <div class="kpi-card kpi-expandable" id="kpi-ult-entrega"><div class="kpi-label">Ultima Entrega</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-sub" id="kpi-ult-entrega-sub" style="font-size:11px;color:var(--text-2);margin-top:2px;"></div><div class="kpi-tooltip"><div class="tt-title">Última Entrega Registrada</div><div class="tt-desc">Peso promedio de la última entrega puntual (por día) de cerdos terminados. Muestra la fecha exacta y cabezas de cada salida.</div><div class="tt-calc">Calculo: Peso promedio ponderado de salida por día con salidas registradas en Sitio 3 (descarte, terminación, faena).</div><div class="tt-ref">Ref: Objetivo JOFA: 115 kg</div></div></div>
         <!-- Panel Ultimas Entregas -->
         <div class="expand-panel" id="panel-entregas">
           <div class="stock-loading" id="panel-entregas-loading">Cargando historial de entregas...</div>
           <div id="panel-entregas-content" style="display:none;">
-            <h4>Ultimas 10 Entregas Mensuales</h4>
+            <h4>Ultimas 20 Entregas</h4>
             <div id="panel-entregas-table" style="margin-top:12px;"></div>
             <div id="panel-entregas-chart" style="min-height:180px;margin-top:16px;"></div>
           </div>
@@ -825,18 +825,18 @@ body {
     }
   }
 
-  async function fetchKpis(site, kpis, startDate, endDate, groupBy) {
+  async function fetchKpis(site, kpis, startDate, endDate, groupBy, dateFormat) {
     if (!state.farmId) throw new Error('No farm connected');
     return apiCall('kpis_' + site, {
       farms: [state.farmId],
       start_date: startDate,
       end_date: endDate,
       group_by: groupBy || 'farm_id',
-      date_format: 'year_month',
+      date_format: dateFormat || 'year_month',
       sort: 'asc',
       kpis: kpis,
       offset: 0,
-      limit: 100
+      limit: 500
     });
   }
 
@@ -1247,22 +1247,23 @@ out.push({ month: period, value: k.value });
       console.error('Inventario error:', e);
     }
 
-    // Ultima entrega (salidas mensuales de Sitio 3)
+    // Ultima entrega (salidas DIARIAS de Sitio 3 — entregas puntuales)
     try {
       const entregaData = await fetchKpis('sitio3',
         ['WAVERAGE_WEIGHT_OUTPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','WAVERAGE_AGE_OUTPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'],
-        monthStart(-9), end, 'reference_date');
-      // fetchKpis returns asc, reverse for newest-first
-      const entregas = ((entregaData && entregaData.data) ? entregaData.data : []).reverse();
+        monthStart(-9), end, 'reference_date', 'year_month_day');
+      // fetchKpis returns asc, reverse for newest-first, filter days with actual deliveries
+      const allDays = ((entregaData && entregaData.data) ? entregaData.data : []).reverse();
+      const entregas = allDays.filter(e => e.kpis.TOTAL_ANIMAL_OUTPUT_STAGE > 0);
       state.entregas = entregas; // cache for panel
       if (entregas.length > 0) {
         const ultima = entregas[0];
         const pesoUlt = ultima.kpis.WAVERAGE_WEIGHT_OUTPUT_STAGE;
         const cabUlt = ultima.kpis.TOTAL_ANIMAL_OUTPUT_STAGE;
-        const mesLabel = ultima.key; // "2025-05"
+        const fechaLabel = ultima.key; // "2026-06-09"
         setKpi('kpi-ult-entrega', fmtNum(pesoUlt, 1) + ' kg', BENCHMARKS.SLAUGHTER_WT, 'Bench', true, ' kg');
-        // Sub-line with month, heads, and vs previous
-        let subHtml = mesLabel + ' &mdash; ' + fmtInt(cabUlt) + ' cab';
+        // Sub-line with date, heads, and vs previous delivery
+        let subHtml = fechaLabel + ' &mdash; ' + fmtInt(cabUlt) + ' cab';
         if (entregas.length > 1) {
           const prev = entregas[1];
           const pesoPrev = prev.kpis.WAVERAGE_WEIGHT_OUTPUT_STAGE;
@@ -1628,35 +1629,43 @@ out.push({ month: period, value: k.value });
     const content = document.getElementById('panel-entregas-content');
     try {
       let entregas = state.entregas;
-      // If not cached, fetch fresh
+      // If not cached, fetch fresh daily data
       if (!entregas || entregas.length === 0) {
         const entregaData = await fetchKpis('sitio3',
           ['WAVERAGE_WEIGHT_OUTPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','WAVERAGE_AGE_OUTPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'],
-          monthStart(-9), today(), 'reference_date');
-        entregas = ((entregaData && entregaData.data) ? entregaData.data : []).reverse();
+          monthStart(-9), today(), 'reference_date', 'year_month_day');
+        const allDays = ((entregaData && entregaData.data) ? entregaData.data : []).reverse();
+        entregas = allDays.filter(e => e.kpis.TOTAL_ANIMAL_OUTPUT_STAGE > 0);
       }
       if (entregas.length === 0) {
         loading.textContent = 'No hay datos de entregas disponibles.';
         return;
       }
 
-      // Table
+      // Day names for formatting
+      const dayNames = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
       const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      function fmtFecha(key) {
+        // key = "2026-06-09"
+        const parts = key.split('-');
+        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        return dayNames[d.getDay()] + ' ' + parseInt(parts[2]) + '/' + monthNames[parseInt(parts[1]) - 1];
+      }
+
+      // Table — show last 20 individual deliveries
       let tableHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
       tableHtml += '<thead><tr style="border-bottom:2px solid var(--bg-3);color:var(--text-2);text-align:left;">';
-      tableHtml += '<th style="padding:6px 8px;">Mes</th><th style="padding:6px 8px;text-align:right;">Peso Prom (kg)</th>';
-      tableHtml += '<th style="padding:6px 8px;text-align:right;">Cabezas</th><th style="padding:6px 8px;text-align:right;">Edad (dias)</th>';
-      tableHtml += '<th style="padding:6px 8px;text-align:right;">Dias Engorde</th><th style="padding:6px 8px;text-align:right;">vs Anterior</th></tr></thead><tbody>';
+      tableHtml += '<th style="padding:6px 8px;">Fecha</th><th style="padding:6px 8px;text-align:right;">Peso (kg)</th>';
+      tableHtml += '<th style="padding:6px 8px;text-align:right;">Cabezas</th><th style="padding:6px 8px;text-align:right;">Edad (d)</th>';
+      tableHtml += '<th style="padding:6px 8px;text-align:right;">Dias Eng.</th><th style="padding:6px 8px;text-align:right;">vs Anterior</th></tr></thead><tbody>';
 
-      entregas.slice(0, 10).forEach((e, i) => {
+      entregas.slice(0, 20).forEach((e, i) => {
         const k = e.kpis;
         const peso = k.WAVERAGE_WEIGHT_OUTPUT_STAGE;
         const cab = k.TOTAL_ANIMAL_OUTPUT_STAGE;
         const edad = k.WAVERAGE_AGE_OUTPUT_STAGE;
         const dias = k.WAVERAGE_DAYS_IN_STAGE_STAGE;
-        // Parse month label
-        const parts = e.key.split('-');
-        const mesStr = monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0];
+        const fechaStr = fmtFecha(e.key);
         // vs anterior
         let diffHtml = '--';
         if (i < entregas.length - 1) {
@@ -1665,12 +1674,15 @@ out.push({ month: period, value: k.value });
             const diff = peso - prevPeso;
             const cls = diff >= 0 ? 'color:var(--green)' : 'color:var(--red)';
             const arrow = diff >= 0 ? '▲' : '▼';
-            diffHtml = '<span style="' + cls + ';">' + arrow + ' ' + Math.abs(diff).toFixed(1) + ' kg</span>';
+            diffHtml = '<span style="' + cls + ';">' + arrow + ' ' + Math.abs(diff).toFixed(1) + '</span>';
           }
         }
         const rowBg = i === 0 ? 'background:var(--bg-2);font-weight:600;' : '';
-        tableHtml += '<tr style="border-bottom:1px solid var(--bg-3);' + rowBg + '">';
-        tableHtml += '<td style="padding:6px 8px;">' + mesStr + (i === 0 ? ' <span style="font-size:9px;color:var(--blue);">◀ ULTIMA</span>' : '') + '</td>';
+        // Highlight small lots (adjustments) with dimmer style
+        const isSmall = cab < 20;
+        const dimStyle = isSmall ? 'opacity:0.5;font-style:italic;' : '';
+        tableHtml += '<tr style="border-bottom:1px solid var(--bg-3);' + rowBg + dimStyle + '">';
+        tableHtml += '<td style="padding:6px 8px;">' + fechaStr + (i === 0 ? ' <span style="font-size:9px;color:var(--blue);">◀ ULTIMA</span>' : '') + (isSmall ? ' <span style="font-size:9px;color:var(--text-3);">ajuste</span>' : '') + '</td>';
         tableHtml += '<td style="padding:6px 8px;text-align:right;color:var(--text-0);">' + fmtNum(peso, 1) + '</td>';
         tableHtml += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(cab) + '</td>';
         tableHtml += '<td style="padding:6px 8px;text-align:right;">' + fmtNum(edad, 0) + '</td>';
@@ -1681,33 +1693,38 @@ out.push({ month: period, value: k.value });
       tableHtml += '</tbody></table>';
       document.getElementById('panel-entregas-table').innerHTML = tableHtml;
 
-      // Bar chart of peso by month
-      const chartData = entregas.slice(0, 10).reverse();
+      // Bar chart — last 20 deliveries (only large ones, >20 cab)
+      const bigDeliveries = entregas.filter(e => e.kpis.TOTAL_ANIMAL_OUTPUT_STAGE >= 20);
+      const chartData = bigDeliveries.slice(0, 15).reverse();
       const maxPeso = Math.max(...chartData.map(e => e.kpis.WAVERAGE_WEIGHT_OUTPUT_STAGE || 0));
+      const maxCab = Math.max(...chartData.map(e => e.kpis.TOTAL_ANIMAL_OUTPUT_STAGE || 0));
       const TARGET = BENCHMARKS.SLAUGHTER_WT || 115;
       const chartMax = Math.max(maxPeso, TARGET) * 1.1;
-      const barW = Math.floor(600 / chartData.length) - 8;
+      const barW = Math.max(20, Math.floor(700 / chartData.length) - 8);
       let bars = '';
       chartData.forEach((e, i) => {
         const peso = e.kpis.WAVERAGE_WEIGHT_OUTPUT_STAGE || 0;
-        const h = (peso / chartMax) * 140;
+        const cab = e.kpis.TOTAL_ANIMAL_OUTPUT_STAGE || 0;
+        const h = (peso / chartMax) * 130;
         const parts = e.key.split('-');
-        const label = monthNames[parseInt(parts[1]) - 1];
+        const label = parseInt(parts[2]) + '/' + parseInt(parts[1]);
         const isLast = i === chartData.length - 1;
         const fill = isLast ? '#4f7df5' : '#3a5fc0';
-        const x = i * (barW + 8) + 30;
-        bars += '<rect x="' + x + '" y="' + (155 - h) + '" width="' + barW + '" height="' + h + '" rx="3" fill="' + fill + '" opacity="' + (isLast ? '1' : '0.6') + '"><title>' + e.key + ': ' + fmtNum(peso, 1) + ' kg</title></rect>';
-        bars += '<text x="' + (x + barW / 2) + '" y="170" text-anchor="middle" fill="var(--text-3)" font-size="9">' + label + '</text>';
-        bars += '<text x="' + (x + barW / 2) + '" y="' + (150 - h) + '" text-anchor="middle" fill="var(--text-1)" font-size="9">' + fmtNum(peso, 0) + '</text>';
+        const x = i * (barW + 6) + 35;
+        bars += '<rect x="' + x + '" y="' + (150 - h) + '" width="' + barW + '" height="' + h + '" rx="3" fill="' + fill + '" opacity="' + (isLast ? '1' : '0.6') + '"><title>' + e.key + ': ' + fmtNum(peso, 1) + ' kg — ' + cab + ' cab</title></rect>';
+        bars += '<text x="' + (x + barW / 2) + '" y="164" text-anchor="middle" fill="var(--text-3)" font-size="8">' + label + '</text>';
+        bars += '<text x="' + (x + barW / 2) + '" y="' + (145 - h) + '" text-anchor="middle" fill="var(--text-1)" font-size="8">' + fmtNum(peso, 0) + '</text>';
+        // Show heads below bar
+        bars += '<text x="' + (x + barW / 2) + '" y="175" text-anchor="middle" fill="var(--text-3)" font-size="7">' + cab + 'c</text>';
       });
       // Target line
-      const targetY = 155 - (TARGET / chartMax) * 140;
-      const totalW = chartData.length * (barW + 8) + 30;
-      bars += '<line x1="25" y1="' + targetY + '" x2="' + totalW + '" y2="' + targetY + '" stroke="var(--yellow)" stroke-width="1" stroke-dasharray="4,3"/>';
-      bars += '<text x="20" y="' + (targetY - 4) + '" fill="var(--yellow)" font-size="9" text-anchor="end">' + TARGET + '</text>';
+      const targetY = 150 - (TARGET / chartMax) * 130;
+      const totalW = chartData.length * (barW + 6) + 40;
+      bars += '<line x1="30" y1="' + targetY + '" x2="' + totalW + '" y2="' + targetY + '" stroke="var(--yellow)" stroke-width="1" stroke-dasharray="4,3"/>';
+      bars += '<text x="25" y="' + (targetY - 4) + '" fill="var(--yellow)" font-size="9" text-anchor="end">' + TARGET + '</text>';
 
-      const chartSvg = '<svg viewBox="0 0 ' + (totalW + 10) + ' 180" style="width:100%;max-height:200px;">' + bars + '</svg>';
-      document.getElementById('panel-entregas-chart').innerHTML = '<h4 style="margin-bottom:8px;">Peso Promedio Salida por Mes (target: ' + TARGET + ' kg)</h4>' + chartSvg;
+      const chartSvg = '<svg viewBox="0 0 ' + (totalW + 10) + ' 185" style="width:100%;max-height:210px;">' + bars + '</svg>';
+      document.getElementById('panel-entregas-chart').innerHTML = '<h4 style="margin-bottom:8px;">Peso por Entrega (target: ' + TARGET + ' kg) &mdash; ultimas ' + chartData.length + ' entregas</h4>' + chartSvg;
 
       loading.style.display = 'none';
       content.style.display = 'block';
