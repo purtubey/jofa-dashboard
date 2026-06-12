@@ -417,6 +417,7 @@ body {
               <div id="stock-indicators"></div>
             </div>
           </div>
+          <div id="stock-ventas-detail" style="display:none;margin-top:16px;padding:16px;background:var(--bg-1);border-radius:var(--radius);border:1px solid var(--border);"></div>
         </div>
 
         <div class="kpi-card kpi-expandable" id="kpi-psy"><div class="kpi-label">PSY</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">PSY — Destetados/Hembra/Año</div><div class="tt-desc">Cerdos destetados por hembra en inventario por año. Es EL indicador clave de productividad de la granja.</div><div class="tt-calc">Calculo: (Total destetados ÷ Hembras promedio) × (365 ÷ días del período)</div><div class="tt-ref">Ref: Top 10%: >30 | Buen nivel: 27-30 | Promedio: 24-27</div></div></div>
@@ -2166,9 +2167,148 @@ out.push({ month: period, value: k.value });
       // loaded flag managed by panelLoaded map
       loading.style.display = 'none';
       content.style.display = 'grid';
+
+      // --- VENTAS DE MADRES DETALLADO (async, carga después del panel principal) ---
+      loadVentasMadresDetail(start, end);
+
     } catch (e) {
       loading.textContent = 'Error al cargar desglose: ' + e.message;
       console.error('Stock panel error:', e);
+    }
+  }
+
+  async function loadVentasMadresDetail(start, end) {
+    const container = document.getElementById('stock-ventas-detail');
+    if (!container) return;
+    container.style.display = 'block';
+    container.innerHTML = '<span style="color:var(--text-3);font-size:13px;">Cargando detalle de ventas de madres...</span>';
+
+    try {
+      // Fetch daily sales data — try with weight KPIs too
+      const salesKpis = ['TOTAL_SALES_SOWS','TOTAL_SALES_GILTS','WAVERAGE_WEIGHT_SALES_SOWS','WAVERAGE_WEIGHT_SALES_GILTS'];
+      const data = await fetchKpis('sitio1', salesKpis, start, end, 'reference_date', 'year_month_day');
+      const allDays = ((data && data.data) ? data.data : []).reverse();
+      const days = allDays.filter(d => {
+        return (d.kpis.TOTAL_SALES_SOWS || 0) + (d.kpis.TOTAL_SALES_GILTS || 0) > 0;
+      });
+
+      // Check if weight data exists
+      let hasWeight = false;
+      days.forEach(d => {
+        if (d.kpis.WAVERAGE_WEIGHT_SALES_SOWS > 0 || d.kpis.WAVERAGE_WEIGHT_SALES_GILTS > 0) hasWeight = true;
+      });
+
+      const dayNames = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+      const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+      // --- 1) MONTHLY TOTALS ---
+      const byMonth = {};
+      days.forEach(d => {
+        const mm = d.key.substring(0, 7);
+        if (!byMonth[mm]) byMonth[mm] = { sows: 0, gilts: 0, wPesoS: 0, wPesoG: 0, entregas: 0 };
+        const s = d.kpis.TOTAL_SALES_SOWS || 0;
+        const g = d.kpis.TOTAL_SALES_GILTS || 0;
+        const ws = d.kpis.WAVERAGE_WEIGHT_SALES_SOWS || 0;
+        const wg = d.kpis.WAVERAGE_WEIGHT_SALES_GILTS || 0;
+        byMonth[mm].sows += s;
+        byMonth[mm].gilts += g;
+        if (ws > 0 && s > 0) byMonth[mm].wPesoS += ws * s;
+        if (wg > 0 && g > 0) byMonth[mm].wPesoG += wg * g;
+        byMonth[mm].entregas += 1;
+      });
+
+      const monthKeys = Object.keys(byMonth).sort().reverse();
+      let html = '<h4 style="margin-bottom:10px;color:var(--text-0);">Ventas de Madres — Detalle</h4>';
+
+      // Monthly summary table
+      html += '<h5 style="margin-bottom:6px;color:var(--text-2);font-weight:500;">Totalizado por Mes</h5>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      html += '<thead><tr style="border-bottom:2px solid var(--bg-3);color:var(--text-2);text-align:left;">';
+      html += '<th style="padding:6px 8px;">Mes</th>';
+      html += '<th style="padding:6px 8px;text-align:right;">Cerdas</th>';
+      html += '<th style="padding:6px 8px;text-align:right;">Primerizas</th>';
+      html += '<th style="padding:6px 8px;text-align:right;">Total</th>';
+      if (hasWeight) html += '<th style="padding:6px 8px;text-align:right;">Peso Prom (kg)</th>';
+      html += '<th style="padding:6px 8px;text-align:right;">Eventos</th>';
+      html += '</tr></thead><tbody>';
+
+      let grandSows = 0, grandGilts = 0, grandWPeso = 0, grandCabPeso = 0;
+      monthKeys.forEach((mm, i) => {
+        const m = byMonth[mm];
+        const total = m.sows + m.gilts;
+        grandSows += m.sows;
+        grandGilts += m.gilts;
+        const totalWPeso = m.wPesoS + m.wPesoG;
+        if (totalWPeso > 0) { grandWPeso += totalWPeso; grandCabPeso += total; }
+        const avgPeso = (totalWPeso > 0 && total > 0) ? totalWPeso / total : null;
+        const parts = mm.split('-');
+        const mesLabel = monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0];
+        const rowBg = i === 0 ? 'background:var(--bg-2);font-weight:600;' : '';
+        html += '<tr style="border-bottom:1px solid var(--bg-3);' + rowBg + '">';
+        html += '<td style="padding:6px 8px;">' + mesLabel + '</td>';
+        html += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(m.sows) + '</td>';
+        html += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(m.gilts) + '</td>';
+        html += '<td style="padding:6px 8px;text-align:right;font-weight:600;">' + fmtInt(total) + '</td>';
+        if (hasWeight) html += '<td style="padding:6px 8px;text-align:right;">' + (avgPeso ? fmtNum(avgPeso, 1) : '--') + '</td>';
+        html += '<td style="padding:6px 8px;text-align:right;">' + m.entregas + '</td>';
+        html += '</tr>';
+      });
+      // Grand total
+      const grandTotal = grandSows + grandGilts;
+      const grandAvgPeso = grandCabPeso > 0 ? grandWPeso / grandCabPeso : null;
+      html += '<tr style="border-top:2px solid var(--text-3);font-weight:700;color:var(--text-0);">';
+      html += '<td style="padding:6px 8px;">TOTAL</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(grandSows) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(grandGilts) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(grandTotal) + '</td>';
+      if (hasWeight) html += '<td style="padding:6px 8px;text-align:right;">' + (grandAvgPeso ? fmtNum(grandAvgPeso, 1) : '--') + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;">' + days.length + '</td>';
+      html += '</tr></tbody></table>';
+
+      // --- 2) INDIVIDUAL DELIVERIES ---
+      html += '<h5 style="margin-top:16px;margin-bottom:6px;color:var(--text-2);font-weight:500;">Detalle por Evento</h5>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      html += '<thead><tr style="border-bottom:2px solid var(--bg-3);color:var(--text-2);text-align:left;">';
+      html += '<th style="padding:5px 8px;">Fecha</th>';
+      html += '<th style="padding:5px 8px;text-align:right;">Cerdas</th>';
+      html += '<th style="padding:5px 8px;text-align:right;">Primerizas</th>';
+      html += '<th style="padding:5px 8px;text-align:right;">Total</th>';
+      if (hasWeight) {
+        html += '<th style="padding:5px 8px;text-align:right;">Peso Cerdas (kg)</th>';
+        html += '<th style="padding:5px 8px;text-align:right;">Peso Prim. (kg)</th>';
+      }
+      html += '</tr></thead><tbody>';
+
+      days.forEach((d, i) => {
+        const s = d.kpis.TOTAL_SALES_SOWS || 0;
+        const g = d.kpis.TOTAL_SALES_GILTS || 0;
+        const ws = d.kpis.WAVERAGE_WEIGHT_SALES_SOWS || 0;
+        const wg = d.kpis.WAVERAGE_WEIGHT_SALES_GILTS || 0;
+        const p = d.key.split('-');
+        const dt = new Date(+p[0], +p[1]-1, +p[2]);
+        const label = dayNames[dt.getDay()] + ' ' + parseInt(p[2]) + '/' + monthNames[+p[1]-1] + '/' + p[0].substring(2);
+        const rowBg = i === 0 ? 'background:var(--bg-2);font-weight:600;' : '';
+        html += '<tr style="border-bottom:1px solid var(--bg-3);' + rowBg + '">';
+        html += '<td style="padding:5px 8px;">' + label + '</td>';
+        html += '<td style="padding:5px 8px;text-align:right;">' + (s > 0 ? fmtInt(s) : '--') + '</td>';
+        html += '<td style="padding:5px 8px;text-align:right;">' + (g > 0 ? fmtInt(g) : '--') + '</td>';
+        html += '<td style="padding:5px 8px;text-align:right;font-weight:600;">' + fmtInt(s + g) + '</td>';
+        if (hasWeight) {
+          html += '<td style="padding:5px 8px;text-align:right;">' + (ws > 0 ? fmtNum(ws, 1) : '--') + '</td>';
+          html += '<td style="padding:5px 8px;text-align:right;">' + (wg > 0 ? fmtNum(wg, 1) : '--') + '</td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+
+      if (days.length === 0) {
+        html += '<div style="color:var(--text-3);font-size:13px;margin-top:8px;">Sin ventas registradas en el periodo.</div>';
+      }
+
+      container.innerHTML = html;
+    } catch (e) {
+      container.innerHTML = '<span style="color:var(--red);font-size:13px;">Error cargando ventas: ' + e.message + '</span>';
+      console.error('Ventas madres detail error:', e);
     }
   }
 
