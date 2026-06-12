@@ -543,7 +543,8 @@ body {
           <div class="stock-loading" id="panel-entregas-loading">Cargando historial de entregas...</div>
           <div id="panel-entregas-content" style="display:none;">
             <h4>Ultimas 20 Entregas</h4>
-            <div id="panel-entregas-table" style="margin-top:12px;"></div>
+            <div id="panel-entregas-monthly" style="margin-top:12px;"></div>
+            <div id="panel-entregas-table" style="margin-top:16px;"></div>
             <div id="panel-entregas-chart" style="min-height:180px;margin-top:16px;"></div>
           </div>
         </div>
@@ -1727,8 +1728,63 @@ out.push({ month: period, value: k.value });
         return dayNames[d.getDay()] + ' ' + parseInt(parts[2]) + '/' + monthNames[parseInt(parts[1]) - 1];
       }
 
+      // --- MONTHLY TOTALS ---
+      const byMonth = {};
+      entregas.forEach(e => {
+        const k = e.kpis;
+        const peso = k.WAVERAGE_WEIGHT_OUTPUT_STAGE || 0;
+        const cab = k.TOTAL_ANIMAL_OUTPUT_STAGE || 0;
+        const edad = k.WAVERAGE_AGE_OUTPUT_STAGE || 0;
+        const mm = e.key.substring(0, 7); // "2026-06"
+        if (!byMonth[mm]) byMonth[mm] = { cab: 0, wPeso: 0, wEdad: 0, entregas: 0 };
+        byMonth[mm].cab += cab;
+        byMonth[mm].wPeso += peso * cab;
+        byMonth[mm].wEdad += edad * cab;
+        byMonth[mm].entregas += 1;
+      });
+      const monthKeys = Object.keys(byMonth).sort().reverse();
+      let mthHtml = '<h4 style="margin-bottom:8px;color:var(--text-1);">Ventas por Mes</h4>';
+      mthHtml += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      mthHtml += '<thead><tr style="border-bottom:2px solid var(--bg-3);color:var(--text-2);text-align:left;">';
+      mthHtml += '<th style="padding:6px 8px;">Mes</th><th style="padding:6px 8px;text-align:right;">Cabezas</th>';
+      mthHtml += '<th style="padding:6px 8px;text-align:right;">Peso Prom (kg)</th><th style="padding:6px 8px;text-align:right;">Edad Prom (d)</th>';
+      mthHtml += '<th style="padding:6px 8px;text-align:right;">Entregas</th>';
+      mthHtml += '<th style="padding:6px 8px;text-align:right;">Kg Totales</th></tr></thead><tbody>';
+      let grandCab = 0, grandKg = 0;
+      monthKeys.forEach((mm, i) => {
+        const m = byMonth[mm];
+        const avgPeso = m.cab > 0 ? m.wPeso / m.cab : 0;
+        const avgEdad = m.cab > 0 ? m.wEdad / m.cab : 0;
+        const kgTotales = Math.round(m.wPeso);
+        grandCab += m.cab;
+        grandKg += kgTotales;
+        const parts = mm.split('-');
+        const mesLabel = monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0];
+        const rowBg = i === 0 ? 'background:var(--bg-2);font-weight:600;' : '';
+        mthHtml += '<tr style="border-bottom:1px solid var(--bg-3);' + rowBg + '">';
+        mthHtml += '<td style="padding:6px 8px;">' + mesLabel + (i === 0 ? ' <span style="font-size:9px;color:var(--blue);">◀ ACTUAL</span>' : '') + '</td>';
+        mthHtml += '<td style="padding:6px 8px;text-align:right;font-weight:600;">' + fmtInt(m.cab) + '</td>';
+        mthHtml += '<td style="padding:6px 8px;text-align:right;">' + fmtNum(avgPeso, 1) + '</td>';
+        mthHtml += '<td style="padding:6px 8px;text-align:right;">' + fmtNum(avgEdad, 0) + '</td>';
+        mthHtml += '<td style="padding:6px 8px;text-align:right;">' + m.entregas + '</td>';
+        mthHtml += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(kgTotales) + '</td>';
+        mthHtml += '</tr>';
+      });
+      // Grand total row
+      mthHtml += '<tr style="border-top:2px solid var(--text-3);font-weight:700;color:var(--text-0);">';
+      mthHtml += '<td style="padding:6px 8px;">TOTAL</td>';
+      mthHtml += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(grandCab) + '</td>';
+      mthHtml += '<td style="padding:6px 8px;text-align:right;">' + (grandCab > 0 ? fmtNum(grandKg / grandCab, 1) : '--') + '</td>';
+      mthHtml += '<td style="padding:6px 8px;text-align:right;">--</td>';
+      mthHtml += '<td style="padding:6px 8px;text-align:right;">' + entregas.length + '</td>';
+      mthHtml += '<td style="padding:6px 8px;text-align:right;">' + fmtInt(grandKg) + '</td>';
+      mthHtml += '</tr>';
+      mthHtml += '</tbody></table>';
+      document.getElementById('panel-entregas-monthly').innerHTML = mthHtml;
+
       // Table — show last 20 individual deliveries
-      let tableHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      let tableHtml = '<h4 style="margin-bottom:8px;color:var(--text-1);">Detalle por Entrega</h4>';
+      tableHtml += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
       tableHtml += '<thead><tr style="border-bottom:2px solid var(--bg-3);color:var(--text-2);text-align:left;">';
       tableHtml += '<th style="padding:6px 8px;">Fecha</th><th style="padding:6px 8px;text-align:right;">Peso (kg)</th>';
       tableHtml += '<th style="padding:6px 8px;text-align:right;">Cabezas</th><th style="padding:6px 8px;text-align:right;">Edad (d)</th>';
