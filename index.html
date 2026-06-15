@@ -37,7 +37,6 @@ body {
   background: var(--bg-0);
   color: var(--text-1);
   min-height: 100vh;
-  min-width: 1200px;
 }
 /* HEADER */
 .header {
@@ -364,6 +363,104 @@ body {
     .kg-mesa .km-title { font-size: 11px; text-transform: uppercase; color: var(--text-3); letter-spacing: 0.5px; margin-bottom: 6px; }
     .kg-mesa .km-val { font-size: 22px; font-weight: 700; }
     .kg-mesa .km-detail { font-size: 11px; color: var(--text-2); margin-top: 4px; }
+
+    /* =================== MOBILE RESPONSIVE =================== */
+    @media (max-width: 768px) {
+      html { font-size: 13px; }
+
+      /* Header compact */
+      .header { padding: 0 12px; height: 48px; }
+      .header-brand h1 { font-size: 0.95rem; letter-spacing: 1px; }
+      .header-brand span { display: none; }
+      .header-status { font-size: 0.65rem; }
+
+      /* Tabs scrollable */
+      .tabs { padding: 0 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab-btn { padding: 10px 14px; font-size: 0.7rem; white-space: nowrap; }
+
+      /* Main content */
+      .main { padding: 14px 10px; }
+      .section { margin-bottom: 20px; }
+      .section-title { font-size: 0.68rem; margin-bottom: 10px; }
+
+      /* KPI grid: 2 columns on mobile */
+      .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .kpi-card { padding: 12px; gap: 4px; }
+      .kpi-label { font-size: 0.6rem; }
+      .kpi-value { font-size: 1.35rem; }
+      .kpi-bench { font-size: 0.62rem; }
+      .kpi-bench .pill { font-size: 0.58rem; padding: 1px 6px; }
+      .kpi-current { font-size: 10px; }
+      .kpi-current .cur-label { font-size: 9px; }
+
+      /* Tooltips: smaller on mobile */
+      .kpi-tooltip { width: 220px; padding: 10px 12px; font-size: 11px; }
+
+      /* Expand panels */
+      .expand-panel { padding: 12px; }
+      .expand-panel h4 { font-size: 11px; }
+      .expand-panel-grid { grid-template-columns: 1fr; gap: 12px; }
+
+      /* Stock panel */
+      .stock-panel-grid { grid-template-columns: 1fr; gap: 14px; }
+      .donut-wrap svg { max-width: 180px; }
+
+      /* Chart grid: stack on mobile */
+      .chart-grid-2 { grid-template-columns: 1fr; }
+
+      /* Tables: horizontal scroll */
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .table-wrap table { min-width: 600px; }
+      .table-wrap th { padding: 8px 10px; font-size: 0.62rem; }
+      .table-wrap td { padding: 7px 10px; font-size: 0.75rem; }
+
+      /* Engorde rows */
+      .peso-month-row { font-size: 11px; padding: 5px 6px; }
+      .peso-month-label { width: 50px; font-size: 10px; }
+      .peso-month-val { width: 55px; font-size: 11px; }
+      .peso-month-cab { width: 45px; font-size: 9px; }
+      .peso-month-deficit { width: 60px; font-size: 9px; }
+
+      /* Weight journey */
+      .weight-journey { padding: 10px; }
+      .wj-center { font-size: 12px; }
+      .wj-center strong { font-size: 14px; }
+
+      /* Kg mesa */
+      .kg-mesa { padding: 10px; }
+      .kg-mesa .km-val { font-size: 18px; }
+
+      /* Flow detail tables */
+      .flow-detail { max-height: 160px; }
+      .flow-row { font-size: 12px; }
+
+      /* Mini KPIs */
+      .mini-kpi { font-size: 12px; }
+
+      /* Config */
+      .config-card { padding: 14px; }
+      .config-row { flex-direction: column; gap: 4px; }
+      .config-label { min-width: unset; }
+
+      /* Date bar */
+      .date-bar { flex-wrap: wrap; gap: 8px; }
+
+      /* Ventas detail in stock panel */
+      #stock-ventas-detail { padding: 10px; overflow-x: auto; }
+      #stock-ventas-detail table { min-width: 400px; }
+
+      /* Entregas panel tables */
+      #panel-entregas-monthly, #panel-entregas-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      #panel-entregas-monthly table, #panel-entregas-table table { min-width: 500px; }
+    }
+
+    /* Extra small screens (phones < 400px) */
+    @media (max-width: 400px) {
+      .kpi-grid { grid-template-columns: 1fr; gap: 8px; }
+      .kpi-value { font-size: 1.5rem; }
+      .kpi-card { padding: 14px; }
+    }
 
 </style>
 </head>
