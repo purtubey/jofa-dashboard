@@ -1357,6 +1357,45 @@ out.push({ month: period, value: k.value });
       setKpi('kpi-inv-total', fmtInt(totalInv), null, null, true);
       // Store for panel use
       state.inventario = { lechones, madres, primerizas, padrillos, recria, engorde, total: totalInv };
+
+      // Balance de Reposicion — entradas vs salidas+muertes engorde (6 meses)
+      try {
+        const balData = await fetchKpis('sitio3',
+          ['TOTAL_ANIMAL_INPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_DEATHS_INPLACE'],
+          monthStart(-5), end, 'reference_date');
+        const balMonths = (balData && balData.data) ? balData.data : [];
+        let totalEnt = 0, totalSal = 0, totalMrt = 0;
+        const balTrend = [];
+        balMonths.forEach(m => {
+          const ent = m.kpis.TOTAL_ANIMAL_INPUT_STAGE || 0;
+          const sal = m.kpis.TOTAL_ANIMAL_OUTPUT_STAGE || 0;
+          const mrt = m.kpis.TOTAL_DEATHS_INPLACE || 0;
+          totalEnt += ent;
+          totalSal += sal;
+          totalMrt += mrt;
+          balTrend.push({ key: m.key, balance: ent - sal - mrt });
+        });
+        const balance6m = totalEnt - totalSal - totalMrt;
+        state.balanceReposicion = { balance6m, totalEnt, totalSal, totalMrt, trend: balTrend };
+
+        // Show balance in inventory card as sub-line
+        const balEl = document.getElementById('kpi-inv-total');
+        if (balEl) {
+          const balColor = balance6m >= 0 ? 'var(--green)' : 'var(--red)';
+          const balArrow = balance6m >= 0 ? '▲' : '▼';
+          let balHtml = '<div style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bg-3);">';
+          balHtml += '<span style="color:var(--text-3);font-size:10px;">Balance Reposicion (6M)</span><br>';
+          balHtml += '<span style="color:' + balColor + ';font-weight:700;font-size:14px;">' + balArrow + ' ' + (balance6m >= 0 ? '+' : '') + fmtInt(balance6m) + ' cab</span>';
+          balHtml += '<span style="color:var(--text-3);font-size:10px;margin-left:6px;">ent ' + fmtInt(totalEnt) + ' - sal ' + fmtInt(totalSal) + ' - mrt ' + fmtInt(totalMrt) + '</span>';
+          balHtml += '</div>';
+          // Append to card
+          const benchEl = balEl.querySelector('.kpi-bench');
+          if (benchEl) benchEl.insertAdjacentHTML('afterend', balHtml);
+        }
+      } catch (e) {
+        console.error('Balance reposicion error:', e);
+      }
+
     } catch (e) {
       setKpiError('kpi-inv-total', e.message);
       console.error('Inventario error:', e);
