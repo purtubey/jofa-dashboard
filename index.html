@@ -1780,7 +1780,7 @@ out.push({ month: period, value: k.value });
   };
 
   // Generic click handler for all expandable cards
-  document.querySelectorAll('.kpi-expandable').forEach(card => {
+  function bindExpandable(card) {
     card.addEventListener('click', function(e) {
       if (e.target.closest('.kpi-tooltip')) return;
       const cfg = panelMap[this.id];
@@ -1808,7 +1808,8 @@ out.push({ month: period, value: k.value });
         cfg.loader();
       }
     });
-  });
+  }
+  document.querySelectorAll('.kpi-expandable').forEach(bindExpandable);
 
   // Generic trend panel loader
   async function loadPanelTrend(key, site, kpiCode, benchmark, color, subKpis) {
@@ -1896,6 +1897,136 @@ out.push({ month: period, value: k.value });
       console.error('GDP panel error:', e);
     }
   }
+
+  // ---- GDP trend manual hacia un panel dinamico (mismo calculo que loadGdpPanel) ----
+  async function loadGdpTrendInto(cid, color) {
+    const loading = document.getElementById('panel-' + cid + '-loading');
+    const content = document.getElementById('panel-' + cid + '-content');
+    const chartId = 'panel-' + cid + '-chart';
+    const kpisId = 'panel-' + cid + '-kpis';
+    try {
+      const months = last6Months();
+      const data = await fetchKpis('sitio3', ['WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'], months[0].start, months[months.length-1].end, 'reference_date');
+      const monthly = (data && data.data) ? data.data : [];
+      const pts = monthly.map(m => {
+        const k = m.kpis;
+        const gdp = (k.WAVERAGE_WEIGHT_OUTPUT_STAGE && k.WAVERAGE_WEIGHT_INPUT_STAGE && k.WAVERAGE_DAYS_IN_STAGE_STAGE)
+          ? (k.WAVERAGE_WEIGHT_OUTPUT_STAGE - k.WAVERAGE_WEIGHT_INPUT_STAGE) / k.WAVERAGE_DAYS_IN_STAGE_STAGE : null;
+        return { month: m.key + '-01', label: monthLabel(m.key + '-01'), value: gdp };
+      });
+      renderLineChart(chartId, pts, BENCHMARKS.GDP, '', color || '#2ecc8b');
+      const subData = await fetchKpis('sitio3', ['WAVERAGE_WEIGHT_OUTPUT_STAGE','WAVERAGE_WEIGHT_INPUT_STAGE','WAVERAGE_DAYS_IN_STAGE_STAGE'], months[0].start, months[months.length-1].end, 'farm_id');
+      const pesoOut = extractKpiValue(subData, 'WAVERAGE_WEIGHT_OUTPUT_STAGE');
+      const pesoIn = extractKpiValue(subData, 'WAVERAGE_WEIGHT_INPUT_STAGE');
+      const diasFase = extractKpiValue(subData, 'WAVERAGE_DAYS_IN_STAGE_STAGE');
+      const gdpAgg = (pesoOut && pesoIn && diasFase) ? (pesoOut - pesoIn) / diasFase : null;
+      const mk = (l, v) => '<div><div class="mini-kpi"><span class="mk-label">' + l + '</span><span class="mk-val">' + v + '</span></div></div>';
+      document.getElementById(kpisId).innerHTML =
+        mk('GDP (kg/dia)', fmtNum(gdpAgg, 3)) + mk('Peso Entrada (kg)', fmtNum(pesoIn, 1)) +
+        mk('Peso Salida (kg)', fmtNum(pesoOut, 1)) + mk('Dias en Engorde', fmtNum(diasFase, 0));
+      loading.style.display = 'none';
+      content.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error: ' + e.message;
+      console.error('GDP trend ' + cid + ' error:', e);
+    }
+  }
+
+  // ---- Paneles desplegables para TODAS las secciones (Servicio, Maternidad, Destete, Mortalidad, Engorde) ----
+  // Cada card abre una tendencia de 6 meses + sub-KPIs relacionados, reutilizando loadPanelTrend.
+  const EXTRA_PANELS = [
+    // SERVICIO (sitio1)
+    { id:'kpi-tot-serv', site:'sitio1', code:'TOTAL_SERVICES', bench:null, color:'#4f7df5', title:'Total Servicios',
+      sub:[['TOTAL_SERVICES','Total Servicios','int'],['TOTAL_PRIMIPAROUS_SERVICES','Serv. Primerizas','int'],['RATE_HEAT_REPETITION','Repeticion Celo','pct']] },
+    { id:'kpi-idc', site:'sitio1', code:'AVERAGE_WMI_DAYS', bench:BENCHMARKS.WMI, color:'#f0c040', title:'IDC (Destete-Cubricion)',
+      sub:[['AVERAGE_WMI_DAYS','IDC (dias)','d1'],['RATE_SERVICES_7DAYS','% Serv. <7d','pct'],['TOTAL_SERVICES','Total Servicios','int']] },
+    { id:'kpi-s7d', site:'sitio1', code:'RATE_SERVICES_7DAYS', bench:null, color:'#2ecc8b', title:'% Servicios antes de 7 dias',
+      sub:[['RATE_SERVICES_7DAYS','% Serv. <7d','pct'],['AVERAGE_WMI_DAYS','IDC (dias)','d1'],['TOTAL_SERVICES','Total Servicios','int']] },
+    { id:'kpi-rep', site:'sitio1', code:'RATE_HEAT_REPETITION', bench:8, color:'#e85d5d', title:'Repeticion de Celo',
+      sub:[['RATE_HEAT_REPETITION','Repeticion Celo','pct'],['TOTAL_SERVICES','Total Servicios','int'],['AVERAGE_WMI_DAYS','IDC (dias)','d1']] },
+    // MATERNIDAD (sitio1)
+    { id:'kpi-tot-par', site:'sitio1', code:'TOTAL_FARROWINGS', bench:null, color:'#4f7df5', title:'Total Partos',
+      sub:[['TOTAL_FARROWINGS','Total Partos','int'],['TOTAL_BORN_ALIVE','Nacidos Vivos','int'],['AVERAGE_BORN_ALIVE','NV Promedio','n1']] },
+    { id:'kpi-nv-prom', site:'sitio1', code:'AVERAGE_BORN_ALIVE', bench:BENCHMARKS.BORN_ALIVE, color:'#2ecc8b', title:'Nacidos Vivos Promedio',
+      sub:[['AVERAGE_BORN_ALIVE','NV Promedio','n1'],['TOTAL_BORN_ALIVE','Total NV','int'],['TOTAL_BORN_STILLBORN','Nac. Muertos','int'],['TOTAL_BORN_MUMMIFIED','Momificados','int']] },
+    { id:'kpi-nt', site:'sitio1', code:'TOTAL_BORN_ALIVE', bench:null, color:'#4f7df5', title:'Total Nacidos Vivos',
+      sub:[['TOTAL_BORN_ALIVE','Total NV','int'],['TOTAL_FARROWINGS','Total Partos','int'],['AVERAGE_BORN_ALIVE','NV Promedio','n1']] },
+    { id:'kpi-mom', site:'sitio1', code:'TOTAL_BORN_MUMMIFIED', bench:null, color:'#e85d5d', title:'Momificados',
+      sub:[['TOTAL_BORN_MUMMIFIED','Momificados','int'],['TOTAL_BORN_STILLBORN','Nac. Muertos','int'],['TOTAL_FARROWINGS','Total Partos','int']] },
+    { id:'kpi-mn', site:'sitio1', code:'TOTAL_BORN_STILLBORN', bench:null, color:'#e85d5d', title:'Nacidos Muertos',
+      sub:[['TOTAL_BORN_STILLBORN','Nac. Muertos','int'],['TOTAL_BORN_MUMMIFIED','Momificados','int'],['TOTAL_FARROWINGS','Total Partos','int']] },
+    // DESTETE (sitio1)
+    { id:'kpi-tot-dest', site:'sitio1', code:'TOTAL_WEANED_PIGS_RELATED', bench:null, color:'#4f7df5', title:'Total Destetes',
+      sub:[['TOTAL_WEANED_PIGS_RELATED','Total Destetados','int'],['AVERAGE_WEANED_PIGS','Prom Destetados','n1'],['PIGLET_WEIGHT_WEAN','Peso Destete (kg)','n2']] },
+    { id:'kpi-prom-dest', site:'sitio1', code:'AVERAGE_WEANED_PIGS', bench:null, color:'#2ecc8b', title:'Promedio Destetados',
+      sub:[['AVERAGE_WEANED_PIGS','Prom Destetados','n1'],['TOTAL_WEANED_PIGS_RELATED','Total Destetados','int'],['AVERAGE_LACTATING_DAYS','Dias Lactancia','n1']] },
+    { id:'kpi-peso-dest', site:'sitio1', code:'PIGLET_WEIGHT_WEAN', bench:null, color:'#2ecc8b', title:'Peso al Destete',
+      sub:[['PIGLET_WEIGHT_WEAN','Peso Destete (kg)','n2'],['WAVERAGE_WEANED_PIGS_DAILY_WEIGHT_GAIN','GPD Lechon','n3'],['AVERAGE_LACTATING_DAYS','Dias Lactancia','n1']] },
+    { id:'kpi-dias-lact', site:'sitio1', code:'AVERAGE_LACTATING_DAYS', bench:null, color:'#f0c040', title:'Dias de Lactancia',
+      sub:[['AVERAGE_LACTATING_DAYS','Dias Lactancia','n1'],['PIGLET_WEIGHT_WEAN','Peso Destete (kg)','n2'],['AVERAGE_WEANED_PIGS','Prom Destetados','n1']] },
+    { id:'kpi-gpd-lech', site:'sitio1', code:'WAVERAGE_WEANED_PIGS_DAILY_WEIGHT_GAIN', bench:null, color:'#2ecc8b', title:'GPD Lechones',
+      sub:[['WAVERAGE_WEANED_PIGS_DAILY_WEIGHT_GAIN','GPD Lechon (kg/d)','n3'],['PIGLET_WEIGHT_WEAN','Peso Destete (kg)','n2'],['AVERAGE_LACTATING_DAYS','Dias Lactancia','n1']] },
+    // MORTALIDAD
+    { id:'kpi-mort-pd', site:'sitio1', code:'RATE_WEANING_PIG_DEATHS', bench:BENCHMARKS.PRE_WEAN_MORT, color:'#e85d5d', title:'Mortalidad Pre-Destete',
+      sub:[['RATE_WEANING_PIG_DEATHS','Mort. Pre-Destete','pct'],['TOTAL_WEANING_PIG_DEATHS','Muertos Lactancia','int'],['TOTAL_BORN_ALIVE','Nacidos Vivos','int']] },
+    { id:'kpi-mort-eng', site:'sitio3', code:'RATE_MORTALITY_INPLACE_STAGE', bench:3, color:'#e85d5d', title:'Mortalidad Engorde',
+      sub:[['RATE_MORTALITY_INPLACE_STAGE','Mortalidad','pct'],['TOTAL_DEATHS_INPLACE','Total Muertes','int'],['TOTAL_ANIMAL_INPUT_STAGE','Ingresados','int'],['TOTAL_ANIMAL_OUTPUT_STAGE','Salidas','int']] },
+    { id:'kpi-mort-hem', info:'La mortalidad de hembras reproductoras no se expone como KPI directo en la API de Agriness. Se estima en el panel de Inventario (seccion Resumen -> Inventario Total -> Indicadores de Flujo) a partir del stock promedio y las bajas registradas.' },
+    // ENGORDE (sitio3)
+    { id:'kpi-gdp-e', gdp:true, color:'#2ecc8b', title:'GDP Engorde' },
+    { id:'kpi-conv-e', site:'sitio3', code:'FEED_CONVERSION_RATIO_STAGE', bench:BENCHMARKS.FEED_CONV, color:'#f0c040', title:'Conversion Alimenticia',
+      sub:[['FEED_CONVERSION_RATIO_STAGE','Conversion','n2'],['TOTAL_FEED_PER_ANIMAL_STAGE','Alimento/Animal (kg)','n1'],['WAVERAGE_WEIGHT_OUTPUT_STAGE','Peso Salida (kg)','n1']] },
+    { id:'kpi-peso-ent', site:'sitio3', code:'WAVERAGE_WEIGHT_INPUT_STAGE', bench:null, color:'#4f7df5', title:'Peso de Entrada',
+      sub:[['WAVERAGE_WEIGHT_INPUT_STAGE','Peso Entrada (kg)','n1'],['TOTAL_ANIMAL_INPUT_STAGE','Ingresados','int'],['WAVERAGE_DAYS_IN_STAGE_STAGE','Dias en Fase','d0']] },
+    { id:'kpi-peso-sal-e', site:'sitio3', code:'WAVERAGE_WEIGHT_OUTPUT_STAGE', bench:BENCHMARKS.SLAUGHTER_WT, color:'#2ecc8b', title:'Peso de Salida',
+      sub:[['WAVERAGE_WEIGHT_OUTPUT_STAGE','Peso Salida (kg)','n1'],['WAVERAGE_DAYS_IN_STAGE_STAGE','Dias en Fase','d0'],['TOTAL_ANIMAL_OUTPUT_STAGE','Salidas','int']] },
+    { id:'kpi-mort-e', site:'sitio3', code:'RATE_MORTALITY_INPLACE_STAGE', bench:3, color:'#e85d5d', title:'Mortalidad Engorde',
+      sub:[['RATE_MORTALITY_INPLACE_STAGE','Mortalidad','pct'],['TOTAL_DEATHS_INPLACE','Total Muertes','int'],['TOTAL_ANIMAL_INPUT_STAGE','Ingresados','int'],['TOTAL_ANIMAL_OUTPUT_STAGE','Salidas','int']] },
+    { id:'kpi-tot-sal', site:'sitio3', code:'TOTAL_ANIMAL_OUTPUT_STAGE', bench:null, color:'#4f7df5', title:'Total Salidas',
+      sub:[['TOTAL_ANIMAL_OUTPUT_STAGE','Salidas','int'],['TOTAL_ANIMAL_INPUT_STAGE','Ingresados','int'],['TOTAL_DEATHS_INPLACE','Muertes','int']] }
+  ];
+
+  function initExtraPanels() {
+    const FMT = {
+      int: (v) => fmtInt(v), pct: (v) => fmtPct(v),
+      n1: (v) => fmtNum(v, 1), n2: (v) => fmtNum(v, 2), n3: (v) => fmtNum(v, 3),
+      d1: (v) => fmtNum(v, 1) + ' d', d0: (v) => fmtNum(v, 0) + ' d'
+    };
+    EXTRA_PANELS.forEach(cfg => {
+      const card = document.getElementById(cfg.id);
+      if (!card || panelMap[cfg.id]) return; // skip missing or already-expandable (Resumen) cards
+      card.classList.add('kpi-expandable');
+      const cid = cfg.id;
+      const panelId = 'panelbox-' + cid;
+      const title = cfg.title || 'Detalle';
+      const headline = cfg.info ? title : (title + ' — Ultimos 6 Meses');
+      const panelHtml = '<div class="expand-panel" id="' + panelId + '">'
+        + '<div class="stock-loading" id="panel-' + cid + '-loading">Cargando ' + title + '...</div>'
+        + '<div id="panel-' + cid + '-content" style="display:none;">'
+        + '<h4>' + headline + '</h4>'
+        + '<div id="panel-' + cid + '-chart" style="min-height:180px;"></div>'
+        + '<div class="expand-panel-grid" id="panel-' + cid + '-kpis" style="margin-top:16px;"></div>'
+        + '</div></div>';
+      card.insertAdjacentHTML('afterend', panelHtml);
+      let loader;
+      if (cfg.info) {
+        loader = () => {
+          document.getElementById('panel-' + cid + '-chart').innerHTML = '<div class="table-empty" style="padding:16px;line-height:1.5;">' + cfg.info + '</div>';
+          document.getElementById('panel-' + cid + '-kpis').innerHTML = '';
+          document.getElementById('panel-' + cid + '-loading').style.display = 'none';
+          document.getElementById('panel-' + cid + '-content').style.display = 'block';
+        };
+      } else if (cfg.gdp) {
+        loader = () => loadGdpTrendInto(cid, cfg.color);
+      } else {
+        const subKpis = (cfg.sub || []).map(s => ({ code: s[0], label: s[1], fmt: FMT[s[2]] || FMT.n1 }));
+        loader = () => loadPanelTrend(cid, cfg.site, cfg.code, cfg.bench, cfg.color, subKpis);
+      }
+      panelMap[cid] = { panel: panelId, loader: loader };
+      bindExpandable(card);
+    });
+  }
+  initExtraPanels();
 
   // ---- ENTREGAS PANEL (last 10 monthly deliveries) ----
   async function loadEntregasPanel() {
