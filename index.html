@@ -280,6 +280,9 @@ body {
     .kpi-current .cur-delta.up-bad { color: var(--red); }
     .kpi-current .cur-delta.down-good { color: var(--green); }
     .kpi-current .cur-delta.down-bad { color: var(--red); }
+    /* Same-month-last-year (YoY) ticker: reuses .kpi-current styling, tinted label */
+    .kpi-yoy { margin-top: 3px; }
+    .kpi-yoy .cur-label { color: var(--blue); }
 
     /* Expandable KPI cards (generic) */
     .kpi-expandable { cursor: pointer; transition: border-color 0.2s; }
@@ -742,8 +745,8 @@ body {
     <div class="section">
       <div class="section-title">Indicadores de Mortalidad</div>
       <div class="kpi-grid" id="kpi-mortalidad">
-        <div class="kpi-card" id="kpi-mort-pd"><div class="kpi-label">Mort. Pre-Destete (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete (%)</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que no sobreviven hasta el destete.</div><div class="tt-calc">Calculo: ((Nacidos vivos - Destetados) ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
-        <div class="kpi-card" id="kpi-mort-eng"><div class="kpi-label">Mort. Engorde (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Engorde (%)</div><div class="tt-desc">Porcentaje de bajas en la etapa de crecimiento-terminación.</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
+        <div class="kpi-card" id="kpi-mort-pd"><div class="kpi-label">Mort. Pre-Destete (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-current kpi-yoy"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Pre-Destete (%)</div><div class="tt-desc">Porcentaje de lechones nacidos vivos que no sobreviven hasta el destete.</div><div class="tt-calc">Calculo: ((Nacidos vivos - Destetados) ÷ Nacidos vivos) × 100</div><div class="tt-ref">Ref: Excelente: <8% | Aceptable: 8-12% | Alerta: >12%</div></div></div>
+        <div class="kpi-card" id="kpi-mort-eng"><div class="kpi-label">Mort. Engorde (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-current kpi-yoy"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Engorde (%)</div><div class="tt-desc">Porcentaje de bajas en la etapa de crecimiento-terminación.</div><div class="tt-calc">Calculo: (Muertos en engorde ÷ Ingresados) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5% | Alerta: >5%</div></div></div>
         <div class="kpi-card" id="kpi-mort-hem"><div class="kpi-label">Mort. Hembras (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad Hembras (%)</div><div class="tt-desc">Porcentaje de hembras reproductoras que mueren (no incluye descartes planificados).</div><div class="tt-calc">Calculo: (Hembras muertas ÷ Stock promedio) × 100 anualizado</div><div class="tt-ref">Ref: Aceptable: <6% anual | Alerta: >8% anual</div></div></div>
       </div>
     </div>
@@ -765,7 +768,7 @@ body {
         <div class="kpi-card" id="kpi-conv-e"><div class="kpi-label">Conversion Alimenticia</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Conversión Alimenticia Engorde</div><div class="tt-desc">Eficiencia de conversión de alimento en carne durante engorde.</div><div class="tt-calc">Calculo: kg alimento consumido ÷ kg ganancia de peso</div><div class="tt-ref">Ref: Excelente: <2.3 | Bueno: 2.3-2.6 | Alerta: >2.8</div></div></div>
         <div class="kpi-card" id="kpi-peso-ent"><div class="kpi-label">Peso Entrada (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Entrada a Engorde</div><div class="tt-desc">Peso promedio del lechón al ingresar a la etapa de engorde (post-destete/recría).</div><div class="tt-calc">Calculo: Suma pesos de entrada ÷ Total ingresados</div><div class="tt-ref">Ref: Típico: 22-28 kg dependiendo del sistema</div></div></div>
         <div class="kpi-card" id="kpi-peso-sal-e"><div class="kpi-label">Peso Salida (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Peso de Salida Engorde</div><div class="tt-desc">Peso promedio al finalizar engorde, antes de envío a faena.</div><div class="tt-calc">Calculo: Suma pesos de salida ÷ Total salidos</div><div class="tt-ref">Ref: Objetivo: 110-130 kg según mercado</div></div></div>
-        <div class="kpi-card" id="kpi-mort-e"><div class="kpi-label">Mortalidad (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad General (%)</div><div class="tt-desc">Tasa de mortalidad total en la etapa de engorde.</div><div class="tt-calc">Calculo: (Muertes ÷ Inventario inicial + Ingresos) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5%</div></div></div>
+        <div class="kpi-card" id="kpi-mort-e"><div class="kpi-label">Mortalidad (%)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-current kpi-yoy"></div><div class="kpi-tooltip"><div class="tt-title">Mortalidad General (%)</div><div class="tt-desc">Tasa de mortalidad total en la etapa de engorde.</div><div class="tt-calc">Calculo: (Muertes ÷ Inventario inicial + Ingresos) × 100</div><div class="tt-ref">Ref: Excelente: <3% | Aceptable: 3-5%</div></div></div>
         <div class="kpi-card" id="kpi-tot-sal"><div class="kpi-label">Total Salidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-current"></div><div class="kpi-tooltip"><div class="tt-title">Total Salidas</div><div class="tt-desc">Cantidad de cerdos que salieron de engorde en el período (ventas, faena, traslados).</div><div class="tt-calc">Calculo: Conteo de eventos de salida registrados.</div><div class="tt-ref">Ref: Relacionar con ingresos de ~150-170 días antes</div></div></div>
       </div>
     </div>
@@ -1014,6 +1017,57 @@ body {
       }
     }
     curEl.innerHTML = '<span class="cur-label">' + mLabel + ':</span> <span class="cur-val">' + currentVal + (unit || '') + '</span>' + deltaHtml;
+  }
+
+  // Ticker "mismo mes del anio pasado" (YoY) para detectar estacionalidad.
+  // lyVal = valor del mismo mes calendario hace 12 meses; curVal = valor del mes en curso.
+  function setKpiYoY(id, lyVal, curVal, lyDateStr, higherIsGood, unit) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    let el = card.querySelector('.kpi-yoy');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'kpi-current kpi-yoy';
+      const curEl = card.querySelector('.kpi-current');
+      if (curEl) curEl.after(el); else card.appendChild(el);
+    }
+    const mNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const p = (lyDateStr || '').split('-');
+    const lbl = p.length === 3 ? (mNames[parseInt(p[1],10)-1] + " '" + p[0].slice(2)) : 'Anio pasado';
+    if (lyVal == null || isNaN(lyVal)) {
+      el.innerHTML = '<span class="cur-label">' + lbl + ':</span> <span class="cur-val">s/d</span>';
+      return;
+    }
+    let deltaHtml = '';
+    if (curVal != null && !isNaN(curVal) && lyVal !== 0) {
+      const diff = curVal - lyVal;
+      const pct = (diff / Math.abs(lyVal)) * 100;
+      const isUp = diff >= 0;
+      const isGood = higherIsGood ? isUp : !isUp;
+      const arrow = isUp ? String.fromCharCode(8593) : String.fromCharCode(8595);
+      const cls = (isUp ? 'up' : 'down') + '-' + (isGood ? 'good' : 'bad');
+      deltaHtml = ' <span class="cur-delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '% YoY</span>';
+    }
+    el.innerHTML = '<span class="cur-label">' + lbl + ':</span> <span class="cur-val">' + fmtPct(lyVal) + '</span>' + deltaHtml;
+  }
+
+  // Carga el mes en curso y el mismo mes del anio pasado para un KPI de mortalidad.
+  async function loadYoY(id, site, kpiCode) {
+    try {
+      const curStart = monthStart(0), curEnd = today();
+      const lyStart = monthStart(-12), lyEnd = monthEnd(-12);
+      const [curData, lyData] = await Promise.all([
+        fetchKpis(site, [kpiCode], curStart, curEnd, 'farm_id'),
+        fetchKpis(site, [kpiCode], lyStart, lyEnd, 'farm_id')
+      ]);
+      const cur = extractKpiValue(curData, kpiCode);
+      const ly = extractKpiValue(lyData, kpiCode);
+      // Mes en curso (mortalidad: menor es mejor -> higherIsGood = false)
+      setKpiCurrent(id, (cur != null && !isNaN(cur)) ? fmtNum(cur, 1) : '--', null, false, '%');
+      setKpiYoY(id, ly, cur, lyStart, false, '%');
+    } catch (e) {
+      setKpiYoY(id, null, null, monthStart(-12), false, '%');
+    }
   }
 
   function setKpiError(id, msg) {
@@ -1563,6 +1617,10 @@ out.push({ month: period, value: k.value });
 
     // Mortality hembras - not directly available, show placeholder
     setKpi('kpi-mort-hem', '--', null, null, false);
+
+    // Ticker estacionalidad: mes en curso vs mismo mes del anio pasado
+    loadYoY('kpi-mort-pd', 'sitio1', 'RATE_WEANING_PIG_DEATHS');
+    loadYoY('kpi-mort-eng', 'sitio3', 'RATE_MORTALITY_INPLACE_STAGE');
   }
 
   // ---- ENGORDE ----
@@ -1586,6 +1644,9 @@ out.push({ month: period, value: k.value });
     } catch (e) {
       ['kpi-gdp-e','kpi-conv-e','kpi-peso-ent','kpi-peso-sal-e','kpi-mort-e','kpi-tot-sal'].forEach(id => setKpiError(id, e.message));
     }
+
+    // Ticker estacionalidad: mes en curso vs mismo mes del anio pasado
+    loadYoY('kpi-mort-e', 'sitio3', 'RATE_MORTALITY_INPLACE_STAGE');
 
     // Salidas table
     try {
