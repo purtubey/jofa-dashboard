@@ -504,7 +504,7 @@ body {
           <div class="stock-loading" id="stock-panel-loading">Cargando desglose del plantel...</div>
           <div class="stock-panel-grid" id="stock-panel-content" style="display:none;">
             <div class="donut-wrap">
-              <h4>Estado Reproductivo</h4>
+              <h4>Estado Reproductivo (Madres + Primerizas)</h4>
               <div id="stock-donut"></div>
               <div class="donut-legend" id="stock-donut-legend"></div>
             </div>
@@ -674,6 +674,12 @@ body {
                 <h4>Indicadores de Flujo</h4>
                 <div id="inv-flow"></div>
               </div>
+            </div>
+            <div style="margin-top:20px;border-top:1px solid var(--bg-3);padding-top:16px;">
+              <h4>Evolucion Balance de Reposicion &mdash; Ultimos 12 Meses</h4>
+              <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">Ingresados a Engorde &minus; Salidos &minus; Muertes, por mes. <span style="color:#2ecc8b;">Verde</span> = se acumula stock &middot; <span style="color:#e85d5d;">Rojo</span> = se reduce.</div>
+              <div id="inv-balance-caption" style="font-size:12px;color:var(--text-1);margin-bottom:8px;"></div>
+              <div id="inv-balance-chart"><div class="loading-overlay"><div class="spinner"></div></div></div>
             </div>
           </div>
         </div>
@@ -2194,6 +2200,44 @@ out.push({ month: period, value: k.value });
     }
   }
 
+  // ---- Grafico de barras +/- para Balance de Reposicion (linea cero, verde positivo / rojo negativo) ----
+  function renderBalanceBars(containerId, pts) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    const valid = pts.filter(p => p.value != null && !isNaN(p.value));
+    if (valid.length === 0) { c.innerHTML = '<div class="table-empty">Sin datos para graficar</div>'; return; }
+    const n = pts.length;
+    const W = Math.max(560, n * 72), H = 250, PT = 24, PB = 46, PL = 48, PR = 14;
+    const ph = H - PT - PB;
+    const half = ph / 2;
+    const y0 = PT + half;
+    const maxAbs = Math.max(1, ...pts.map(p => Math.abs(p.value || 0)));
+    const cw = W - PL - PR;
+    const slot = cw / n;
+    const barW = Math.min(46, slot * 0.6);
+    let svg = '';
+    // y-axis reference labels
+    svg += '<text x="' + (PL - 6) + '" y="' + (PT + 4) + '" text-anchor="end" fill="var(--text-3)" font-size="9">+' + fmtInt(maxAbs) + '</text>';
+    svg += '<text x="' + (PL - 6) + '" y="' + (y0 + 3) + '" text-anchor="end" fill="var(--text-3)" font-size="9">0</text>';
+    svg += '<text x="' + (PL - 6) + '" y="' + (y0 + half) + '" text-anchor="end" fill="var(--text-3)" font-size="9">-' + fmtInt(maxAbs) + '</text>';
+    // zero line
+    svg += '<line x1="' + PL + '" y1="' + y0 + '" x2="' + (W - PR) + '" y2="' + y0 + '" stroke="var(--text-3)" stroke-width="1"/>';
+    pts.forEach((p, i) => {
+      const v = p.value || 0;
+      const cx = PL + slot * i + slot / 2;
+      const bh = Math.abs(v) / maxAbs * half;
+      const pos = v >= 0;
+      const y = pos ? y0 - bh : y0;
+      const color = pos ? '#2ecc8b' : '#e85d5d';
+      const isLast = i === n - 1;
+      svg += '<rect x="' + (cx - barW / 2) + '" y="' + y + '" width="' + barW + '" height="' + Math.max(1, bh) + '" rx="2" fill="' + color + '" opacity="' + (isLast ? '1' : '0.8') + '"><title>' + p.label + ': ' + (v >= 0 ? '+' : '') + fmtInt(v) + ' cab (ent ' + fmtInt(p.ent) + ' / sal ' + fmtInt(p.sal) + ' / mrt ' + fmtInt(p.mrt) + ')</title></rect>';
+      const ly = pos ? (y - 4) : (y + bh + 11);
+      svg += '<text x="' + cx + '" y="' + ly + '" text-anchor="middle" fill="var(--text-1)" font-size="9">' + (v >= 0 ? '+' : '') + fmtInt(v) + '</text>';
+      svg += '<text x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle" fill="var(--text-3)" font-size="9">' + p.label + '</text>';
+    });
+    c.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;">' + svg + '</svg>';
+  }
+
   // ---- INVENTARIO PANEL ----
   async function loadInventarioPanel() {
     const loading = document.getElementById('panel-inv-loading');
@@ -2300,6 +2344,33 @@ out.push({ month: period, value: k.value });
       const totalMuertes = s2dead + s3dead;
       flowHtml += '<div class="mini-kpi"><span class="mk-label" style="font-weight:600;">Total muertes post-destete</span><span class="mk-val" style="color:var(--red);font-size:15px;">-' + fmtInt(totalMuertes) + '</span></div>';
       document.getElementById('inv-flow').innerHTML = flowHtml;
+
+      // --- Evolucion Balance de Reposicion (12 meses) ---
+      try {
+        const balData = await fetchKpis('sitio3',
+          ['TOTAL_ANIMAL_INPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_DEATHS_INPLACE'],
+          monthStart(-11), today(), 'reference_date');
+        const bmonths = (balData && balData.data) ? balData.data : [];
+        const pts = bmonths.map(m => {
+          const k = m.kpis || {};
+          const ent = k.TOTAL_ANIMAL_INPUT_STAGE || 0;
+          const sal = k.TOTAL_ANIMAL_OUTPUT_STAGE || 0;
+          const mrt = k.TOTAL_DEATHS_INPLACE || 0;
+          return { label: monthLabel(m.key + '-01'), value: ent - sal - mrt, ent: ent, sal: sal, mrt: mrt };
+        });
+        renderBalanceBars('inv-balance-chart', pts);
+        const tot = pts.reduce((a, p) => a + p.value, 0);
+        const prom = pts.length ? tot / pts.length : 0;
+        const totColor = tot >= 0 ? 'var(--green)' : 'var(--red)';
+        const promColor = prom >= 0 ? 'var(--green)' : 'var(--red)';
+        document.getElementById('inv-balance-caption').innerHTML =
+          'Acumulado 12M: <strong style="color:' + totColor + ';">' + (tot >= 0 ? '+' : '') + fmtInt(tot) + ' cab</strong>'
+          + ' &middot; Promedio mensual: <strong style="color:' + promColor + ';">' + (prom >= 0 ? '+' : '') + fmtInt(prom) + ' cab</strong>';
+      } catch (e) {
+        const el = document.getElementById('inv-balance-chart');
+        if (el) el.innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+        console.error('Balance reposicion 12M error:', e);
+      }
 
       loading.style.display = 'none';
       content.style.display = 'block';
