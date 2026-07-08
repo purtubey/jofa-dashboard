@@ -652,6 +652,16 @@ body {
         </div>
       </div>
     </div>
+    <!-- Ventas -->
+    <div class="section">
+      <div class="section-title" id="ventas-resumen-title">Ventas del mes en curso</div>
+      <div class="kpi-grid" id="kpi-resumen-ventas">
+        <div class="kpi-card" id="kpi-r-ing-ventas"><div class="kpi-label">Ingreso Ventas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Ingreso por Ventas</div><div class="tt-desc">Suma del valor de venta (price) desde que se cargan precios en Agriness.</div><div class="tt-calc">Calculo: Suma de price de eventos de venta.</div><div class="tt-ref">Solo ventas con precio cargado.</div></div></div>
+        <div class="kpi-card" id="kpi-r-cab-ventas"><div class="kpi-label">Cabezas Vendidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas</div><div class="tt-desc">Total de animales vendidos en el periodo.</div><div class="tt-calc">Calculo: Suma de quantity de eventos de venta.</div><div class="tt-ref">Incluye venta normal, descarte y seleccion.</div></div></div>
+        <div class="kpi-card" id="kpi-r-prkg-ventas"><div class="kpi-label">$/kg Promedio</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Kilo</div><div class="tt-desc">Ingreso dividido por los kilos vendidos con precio.</div><div class="tt-calc">Calculo: Ingreso ÷ Kg (ventas con precio).</div><div class="tt-ref">Indicador clave de valor de venta.</div></div></div>
+        <div class="kpi-card" id="kpi-r-peso-ventas"><div class="kpi-label">Peso Medio Venta (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el periodo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
+      </div>
+    </div>
     <!-- Inventario General -->
     <div class="section">
       <div class="section-title">Inventario General</div>
@@ -1552,6 +1562,33 @@ out.push({ month: period, value: k.value });
       console.error('Ultima entrega error:', e);
     }
 
+    // Cards de ventas en el resumen (desde carga de precios)
+    loadVentasResumen();
+  }
+
+  // Cards de ventas para la pestania Resumen (mes en curso, para ver como viene el mes)
+  async function loadVentasResumen() {
+    const ids = ['kpi-r-ing-ventas','kpi-r-cab-ventas','kpi-r-prkg-ventas','kpi-r-peso-ventas'];
+    const mNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const now = new Date();
+    const titleEl = document.getElementById('ventas-resumen-title');
+    if (titleEl) titleEl.textContent = 'Ventas del mes en curso — ' + mNames[now.getMonth()] + ' ' + now.getFullYear();
+    try {
+      const data = await fetchEvents('salidas_lotes', monthStart(0), today());
+      const rows = Array.isArray(data) ? data : (data && (data.data || data.results)) || [];
+      const ventas = rows.filter(r => VENTA_SALE_TYPES.includes(r.event_type));
+      let cab = 0, kg = 0, ingreso = 0, kgP = 0;
+      ventas.forEach(r => {
+        cab += +r.quantity || 0; kg += +r.total_weight || 0;
+        if (r.price != null && r.price !== '' && !isNaN(+r.price)) { ingreso += +r.price; kgP += +r.total_weight || 0; }
+      });
+      setKpi('kpi-r-ing-ventas', fmtMoneyShort(ingreso), null, null, true);
+      setKpi('kpi-r-cab-ventas', fmtInt(cab), null, null, true);
+      setKpi('kpi-r-prkg-ventas', kgP ? fmtMoney(ingreso / kgP) : 's/precio', null, null, true);
+      setKpi('kpi-r-peso-ventas', cab ? fmtNum(kg / cab, 1) + ' kg' : '--', null, null, true);
+    } catch (e) {
+      ids.forEach(id => setKpiError(id, e.message));
+    }
   }
 
   // ---- SERVICIO ----
@@ -1838,7 +1875,7 @@ out.push({ month: period, value: k.value });
       if (r.price != null && r.price !== '' && !isNaN(+r.price)) byM[m].ing += +r.price;
     });
     const pts = Object.keys(byM).sort().map(m => ({ month: m + '-01', label: monthLabel(m + '-01'), value: byM[m].ing }));
-    renderLineChart('ventas-evol', pts, null, '', '#2ecc8b');
+    renderVentasBars('ventas-evol', pts);
 
     // Tabla detalle
     const tRows = ventas.slice().sort((a, b) => String(b.event_date || '').localeCompare(String(a.event_date || ''))).slice(0, 150).map(r => {
@@ -1864,13 +1901,15 @@ out.push({ month: period, value: k.value });
     const c = document.getElementById(id);
     if (!c) return;
     if (!list || list.length === 0) { c.innerHTML = '<div class="table-empty">Sin ventas en el periodo</div>'; return; }
-    let h = '<table><thead><tr><th>Frigorifico</th><th style="text-align:right;">Cabezas</th><th style="text-align:right;">Kg</th><th style="text-align:right;">Ingreso</th><th style="text-align:right;">$/kg</th><th style="min-width:120px;">% Ingreso</th></tr></thead><tbody>';
+    let h = '<table><thead><tr><th>Frigorifico</th><th style="text-align:right;">Cabezas</th><th style="text-align:right;">Kg</th><th style="text-align:right;">Peso Prom</th><th style="text-align:right;">Ingreso</th><th style="text-align:right;">$/kg</th><th style="min-width:110px;">% Ingreso</th></tr></thead><tbody>';
     list.forEach(f => {
       const pct = totalIng ? (f.ing / totalIng * 100) : 0;
+      const pesoProm = f.cab ? (f.kg / f.cab) : null;
       h += '<tr>'
         + '<td>' + f.name + '</td>'
         + '<td style="text-align:right;">' + fmtInt(f.cab) + '</td>'
         + '<td style="text-align:right;">' + fmtInt(f.kg) + '</td>'
+        + '<td style="text-align:right;">' + (pesoProm != null ? fmtNum(pesoProm, 1) + ' kg' : '--') + '</td>'
         + '<td style="text-align:right;font-weight:600;">' + fmtMoney(f.ing) + '</td>'
         + '<td style="text-align:right;">' + (f.prkg != null ? fmtMoney(f.prkg) : '--') + '</td>'
         + '<td><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;background:var(--bg-3);border-radius:4px;height:8px;overflow:hidden;"><div style="width:' + pct.toFixed(0) + '%;background:#2ecc8b;height:100%;"></div></div><span style="font-size:11px;min-width:32px;text-align:right;color:var(--text-2);">' + pct.toFixed(0) + '%</span></div></td>'
@@ -1878,6 +1917,34 @@ out.push({ month: period, value: k.value });
     });
     h += '</tbody></table>';
     c.innerHTML = h;
+  }
+
+  // Grafico de barras para evolucion mensual de ingresos por ventas (positivo, verde)
+  function renderVentasBars(containerId, pts) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    const valid = (pts || []).filter(p => p.value != null && !isNaN(p.value));
+    if (valid.length === 0) { c.innerHTML = '<div class="table-empty">Sin datos para graficar</div>'; return; }
+    const n = pts.length;
+    const W = Math.max(560, n * 74), H = 230, PT = 26, PB = 40, PL = 16, PR = 14;
+    const ph = H - PT - PB;
+    const y0 = PT + ph;
+    const maxV = Math.max(1, ...pts.map(p => p.value || 0));
+    const cw = W - PL - PR;
+    const slot = cw / n;
+    const barW = Math.min(50, slot * 0.62);
+    let svg = '<line x1="' + PL + '" y1="' + y0 + '" x2="' + (W - PR) + '" y2="' + y0 + '" stroke="var(--text-3)" stroke-width="1"/>';
+    pts.forEach((p, i) => {
+      const v = p.value || 0;
+      const cx = PL + slot * i + slot / 2;
+      const bh = v / maxV * ph;
+      const y = y0 - bh;
+      const isLast = i === n - 1;
+      svg += '<rect x="' + (cx - barW / 2) + '" y="' + y + '" width="' + barW + '" height="' + Math.max(1, bh) + '" rx="3" fill="#2ecc8b" opacity="' + (isLast ? '1' : '0.82') + '"><title>' + p.label + ': ' + fmtMoney(v) + '</title></rect>';
+      svg += '<text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" fill="var(--text-1)" font-size="9">' + fmtMoneyShort(v) + '</text>';
+      svg += '<text x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle" fill="var(--text-3)" font-size="9">' + p.label + '</text>';
+    });
+    c.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;">' + svg + '</svg>';
   }
 
   // ---- INDICADORES (TRENDS) ----
