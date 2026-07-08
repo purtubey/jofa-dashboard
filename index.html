@@ -487,6 +487,7 @@ body {
   <button class="tab-btn" data-tab="destete">Destete</button>
   <button class="tab-btn" data-tab="mortalidad">Mortalidad</button>
   <button class="tab-btn" data-tab="engorde">Engorde</button>
+  <button class="tab-btn" data-tab="ventas">Ventas</button>
   <button class="tab-btn" data-tab="indicadores">Indicadores</button>
   <button class="tab-btn" data-tab="config">Config</button>
 </nav>
@@ -786,6 +787,41 @@ body {
     </div>
   </div>
 
+  <!-- VENTAS -->
+  <div class="page" id="page-ventas">
+    <div class="section">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <span>Ventas de Lotes</span>
+        <select id="ventas-period" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+          <option value="thismonth">Mes actual</option>
+          <option value="3m">Ultimos 3 meses</option>
+          <option value="12m" selected>Ultimos 12 meses</option>
+          <option value="year">Anio actual</option>
+        </select>
+      </div>
+      <div class="kpi-grid" id="kpi-ventas">
+        <div class="kpi-card" id="v-ingreso"><div class="kpi-label">Ingreso Total</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Ingreso Total por Ventas</div><div class="tt-desc">Suma del valor de venta (campo price) de los lotes vendidos en el periodo.</div><div class="tt-calc">Calculo: Suma de price de eventos tipo venta.</div><div class="tt-ref">Solo cuenta ventas con precio cargado en Agriness.</div></div></div>
+        <div class="kpi-card" id="v-cabezas"><div class="kpi-label">Cabezas Vendidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas</div><div class="tt-desc">Total de animales vendidos en el periodo (quantity).</div><div class="tt-calc">Calculo: Suma de quantity de eventos de venta.</div><div class="tt-ref">Incluye venta normal, descarte y seleccion.</div></div></div>
+        <div class="kpi-card" id="v-kg"><div class="kpi-label">Kg Vendidos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Kilos Vendidos</div><div class="tt-desc">Peso total vendido en el periodo (total_weight).</div><div class="tt-calc">Calculo: Suma de total_weight de eventos de venta.</div><div class="tt-ref">Base para el calculo de $/kg.</div></div></div>
+        <div class="kpi-card" id="v-prkg"><div class="kpi-label">$/kg Promedio</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Kilo</div><div class="tt-desc">Ingreso total dividido por los kilos vendidos con precio cargado.</div><div class="tt-calc">Calculo: Ingreso ÷ Kg (solo ventas con precio).</div><div class="tt-ref">Indicador clave de valor de venta.</div></div></div>
+        <div class="kpi-card" id="v-prcab"><div class="kpi-label">$/Cabeza</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Cabeza</div><div class="tt-desc">Ingreso total dividido por las cabezas vendidas con precio cargado.</div><div class="tt-calc">Calculo: Ingreso ÷ Cabezas (solo ventas con precio).</div><div class="tt-ref">Ticket promedio por animal.</div></div></div>
+        <div class="kpi-card" id="v-pmedio"><div class="kpi-label">Peso Medio (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el periodo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Ventas por Frigorifico</div>
+      <div class="table-wrap" id="ventas-frig"><div class="loading-overlay"><div class="spinner"></div> Cargando...</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Evolucion Mensual de Ingresos</div>
+      <div id="ventas-evol"><div class="loading-overlay"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Detalle de Ventas</div>
+      <div class="table-wrap" id="table-ventas"><div class="loading-overlay"><div class="spinner"></div> Cargando ventas...</div></div>
+    </div>
+  </div>
+
   <!-- INDICADORES -->
   <div class="page" id="page-indicadores">
     <div class="section">
@@ -886,9 +922,21 @@ body {
   }
   function fmtDate(d) {
     if (!d) return '--';
+    d = String(d).slice(0, 10);
     const p = d.split('-');
     if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
     return d;
+  }
+  function fmtMoney(v) {
+    if (v == null || isNaN(v)) return '--';
+    return '$ ' + fmtInt(v);
+  }
+  function fmtMoneyShort(v) {
+    if (v == null || isNaN(v)) return '--';
+    const a = Math.abs(v);
+    if (a >= 1e6) return '$ ' + fmtNum(v / 1e6, 2) + ' M';
+    if (a >= 1e3) return '$ ' + fmtNum(v / 1e3, 1) + ' k';
+    return '$ ' + fmtInt(v);
   }
 
   function dateStr(d) {
@@ -1242,6 +1290,12 @@ out.push({ month: period, value: k.value });
     loadTabData(tab);
   });
 
+  // Selector de periodo de Ventas: recarga al cambiar
+  (function(){
+    const vp = document.getElementById('ventas-period');
+    if (vp) vp.addEventListener('change', function(){ if (state.connected) loadVentas(); });
+  })();
+
   // ---- CONNECTION ----
   async function checkConnection() {
     const dot = document.getElementById('statusDot');
@@ -1322,6 +1376,7 @@ out.push({ month: period, value: k.value });
       case 'destete': await loadDestete(); break;
       case 'mortalidad': await loadMortalidad(); break;
       case 'engorde': await loadEngorde(); break;
+      case 'ventas': await loadVentas(); break;
       case 'indicadores': await loadIndicadores(); break;
     }
   }
@@ -1657,20 +1712,157 @@ out.push({ month: period, value: k.value });
     // Salidas table
     try {
       const events = await fetchEvents('salidas_lotes', monthStart(-2), end);
-      let rows = Array.isArray(events) ? events : (events && events.results ? events.results : []);
+      let rows = Array.isArray(events) ? events : (events && (events.data || events.results)) || [];
       const tableRows = rows.slice(0, 50).map(r => [
-        fmtDate(r.event_date || r.date || r.output_date),
-        r.lot_code || r.lot || r.batch || '--',
-        r.event_type || r.type || r.output_type || '--',
-        r.quantity || r.total_animals || r.head_count || '--',
-        r.total_weight ? fmtNum(r.total_weight, 0) + ' kg' : '--',
-        r.avg_weight ? fmtNum(r.avg_weight, 1) + ' kg' : (r.average_weight ? fmtNum(r.average_weight, 1) + ' kg' : '--'),
-        r.supplier || r.destination || r.buyer || '--'
+        fmtDate(r.event_date),
+        r.animal_group_name || '--',
+        VENTA_TIPOS[r.event_type] || r.event_type || '--',
+        fmtInt(r.quantity),
+        r.total_weight ? fmtInt(r.total_weight) + ' kg' : '--',
+        r.average_weight ? fmtNum(r.average_weight, 1) + ' kg' : ((r.total_weight && r.quantity) ? fmtNum(r.total_weight / r.quantity, 1) + ' kg' : '--'),
+        r.supplier_name || '--'
       ]);
       renderTable('table-salidas', ['Fecha','Lote','Tipo','Cantidad','Peso Total','Peso Prom','Destino'], tableRows);
     } catch (e) {
       document.getElementById('table-salidas').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
     }
+  }
+
+  // ---- VENTAS ----
+  const VENTA_TIPOS = {
+    sale: 'Venta', fallout_pig_sale: 'Venta descarte', selection_sale: 'Venta seleccion',
+    internal_consumption: 'Consumo interno', pig_donation: 'Donacion', internal_replacement: 'Reposicion interna'
+  };
+  const VENTA_SALE_TYPES = ['sale', 'fallout_pig_sale', 'selection_sale'];
+
+  async function loadVentas() {
+    const sel = document.getElementById('ventas-period');
+    const period = sel ? sel.value : '12m';
+    const end = today();
+    let start;
+    if (period === 'thismonth') start = monthStart(0);
+    else if (period === '3m') start = monthStart(-2);
+    else if (period === 'year') start = new Date().getFullYear() + '-01-01';
+    else start = monthStart(-11);
+
+    ['v-ingreso','v-cabezas','v-kg','v-prkg','v-prcab','v-pmedio'].forEach(id => {
+      const c = document.getElementById(id); if (!c) return;
+      const v = c.querySelector('.kpi-value'); v.classList.add('loading'); v.textContent = '--';
+      const b = c.querySelector('.kpi-bench'); if (b) b.innerHTML = '';
+    });
+    document.getElementById('ventas-frig').innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Cargando...</div>';
+    document.getElementById('ventas-evol').innerHTML = '<div class="loading-overlay"><div class="spinner"></div></div>';
+    document.getElementById('table-ventas').innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Cargando ventas...</div>';
+
+    let rows;
+    try {
+      const data = await fetchEvents('salidas_lotes', start, end);
+      rows = Array.isArray(data) ? data : (data && (data.data || data.results)) || [];
+    } catch (e) {
+      document.getElementById('table-ventas').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+      document.getElementById('ventas-frig').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+      document.getElementById('ventas-evol').innerHTML = '<div class="table-empty">Error: ' + e.message + '</div>';
+      return;
+    }
+
+    const ventas = rows.filter(r => VENTA_SALE_TYPES.includes(r.event_type));
+    if (ventas.length === 0) {
+      const msg = '<div class="table-empty">Sin ventas registradas en el periodo seleccionado</div>';
+      document.getElementById('ventas-frig').innerHTML = msg;
+      document.getElementById('ventas-evol').innerHTML = msg;
+      document.getElementById('table-ventas').innerHTML = msg;
+      ['v-ingreso','v-cabezas','v-kg','v-prkg','v-prcab','v-pmedio'].forEach(id => setKpi(id, '--', null, null, true));
+      return;
+    }
+
+    // Totales
+    let cab = 0, kg = 0, ingreso = 0, kgConPrecio = 0, cabConPrecio = 0, ventasConPrecio = 0;
+    ventas.forEach(r => {
+      const q = +r.quantity || 0, w = +r.total_weight || 0, p = (r.price != null && r.price !== '') ? +r.price : null;
+      cab += q; kg += w;
+      if (p != null && !isNaN(p)) { ingreso += p; kgConPrecio += w; cabConPrecio += q; ventasConPrecio++; }
+    });
+    const prkg = kgConPrecio ? ingreso / kgConPrecio : null;
+    const prcab = cabConPrecio ? ingreso / cabConPrecio : null;
+    const pmedio = cab ? kg / cab : null;
+
+    setKpi('v-ingreso', fmtMoneyShort(ingreso), null, null, true);
+    setKpi('v-cabezas', fmtInt(cab), null, null, true);
+    setKpi('v-kg', fmtInt(kg) + ' kg', null, null, true);
+    setKpi('v-prkg', prkg != null ? fmtMoney(prkg) : 's/precio', null, null, true);
+    setKpi('v-prcab', prcab != null ? fmtMoney(prcab) : 's/precio', null, null, true);
+    setKpi('v-pmedio', pmedio != null ? fmtNum(pmedio, 1) + ' kg' : '--', null, null, true);
+    // Nota si faltan precios
+    const ingCard = document.getElementById('v-ingreso');
+    if (ingCard) {
+      const b = ingCard.querySelector('.kpi-bench');
+      if (b) b.innerHTML = ventasConPrecio < ventas.length
+        ? '<span style="color:var(--text-3);font-size:11px;">' + ventasConPrecio + '/' + ventas.length + ' ventas con precio</span>'
+        : '<span style="color:var(--green);font-size:11px;">' + ventas.length + ' ventas con precio</span>';
+    }
+
+    // Por frigorifico
+    const byF = {};
+    ventas.forEach(r => {
+      const f = (r.supplier_name || 'Sin dato').trim() || 'Sin dato';
+      if (!byF[f]) byF[f] = { cab: 0, kg: 0, ing: 0, kgP: 0 };
+      byF[f].cab += +r.quantity || 0; byF[f].kg += +r.total_weight || 0;
+      if (r.price != null && r.price !== '' && !isNaN(+r.price)) { byF[f].ing += +r.price; byF[f].kgP += +r.total_weight || 0; }
+    });
+    const frigList = Object.entries(byF).map(([name, v]) => ({ name, cab: v.cab, kg: v.kg, ing: v.ing, prkg: v.kgP ? v.ing / v.kgP : null }))
+      .sort((a, b) => (b.ing - a.ing) || (b.cab - a.cab));
+    renderVentasFrig('ventas-frig', frigList, ingreso);
+
+    // Evolucion mensual de ingresos
+    const byM = {};
+    ventas.forEach(r => {
+      const m = String(r.event_date || '').slice(0, 7);
+      if (!m) return;
+      if (!byM[m]) byM[m] = { ing: 0, cab: 0 };
+      byM[m].cab += +r.quantity || 0;
+      if (r.price != null && r.price !== '' && !isNaN(+r.price)) byM[m].ing += +r.price;
+    });
+    const pts = Object.keys(byM).sort().map(m => ({ month: m + '-01', label: monthLabel(m + '-01'), value: byM[m].ing }));
+    renderLineChart('ventas-evol', pts, null, '', '#2ecc8b');
+
+    // Tabla detalle
+    const tRows = ventas.slice().sort((a, b) => String(b.event_date || '').localeCompare(String(a.event_date || ''))).slice(0, 150).map(r => {
+      const q = +r.quantity || 0, w = +r.total_weight || 0, p = (r.price != null && r.price !== '') ? +r.price : null;
+      return [
+        fmtDate(r.event_date),
+        r.animal_group_name || '--',
+        VENTA_TIPOS[r.event_type] || r.event_type || '--',
+        fmtInt(q),
+        w ? fmtInt(w) + ' kg' : '--',
+        (r.average_weight ? fmtNum(r.average_weight, 1) : (w && q ? fmtNum(w / q, 1) : '--')),
+        (p != null && w) ? fmtMoney(p / w) : '--',
+        p != null ? fmtMoney(p) : '--',
+        r.supplier_name || '--',
+        r.invoice_number || '--',
+        r.transport_document || '--'
+      ];
+    });
+    renderTable('table-ventas', ['Fecha','Lote','Tipo','Cabezas','Peso Total','Peso Med (kg)','$/kg','Valor','Frigorifico','Factura','DTA'], tRows);
+  }
+
+  function renderVentasFrig(id, list, totalIng) {
+    const c = document.getElementById(id);
+    if (!c) return;
+    if (!list || list.length === 0) { c.innerHTML = '<div class="table-empty">Sin ventas en el periodo</div>'; return; }
+    let h = '<table><thead><tr><th>Frigorifico</th><th style="text-align:right;">Cabezas</th><th style="text-align:right;">Kg</th><th style="text-align:right;">Ingreso</th><th style="text-align:right;">$/kg</th><th style="min-width:120px;">% Ingreso</th></tr></thead><tbody>';
+    list.forEach(f => {
+      const pct = totalIng ? (f.ing / totalIng * 100) : 0;
+      h += '<tr>'
+        + '<td>' + f.name + '</td>'
+        + '<td style="text-align:right;">' + fmtInt(f.cab) + '</td>'
+        + '<td style="text-align:right;">' + fmtInt(f.kg) + '</td>'
+        + '<td style="text-align:right;font-weight:600;">' + fmtMoney(f.ing) + '</td>'
+        + '<td style="text-align:right;">' + (f.prkg != null ? fmtMoney(f.prkg) : '--') + '</td>'
+        + '<td><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;background:var(--bg-3);border-radius:4px;height:8px;overflow:hidden;"><div style="width:' + pct.toFixed(0) + '%;background:#2ecc8b;height:100%;"></div></div><span style="font-size:11px;min-width:32px;text-align:right;color:var(--text-2);">' + pct.toFixed(0) + '%</span></div></td>'
+        + '</tr>';
+    });
+    h += '</tbody></table>';
+    c.innerHTML = h;
   }
 
   // ---- INDICADORES (TRENDS) ----
