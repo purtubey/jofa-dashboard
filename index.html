@@ -793,12 +793,14 @@ body {
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>Ventas de Lotes</span>
         <select id="ventas-period" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+          <option value="priceStart" selected>Desde carga de precios</option>
           <option value="thismonth">Mes actual</option>
           <option value="3m">Ultimos 3 meses</option>
-          <option value="12m" selected>Ultimos 12 meses</option>
+          <option value="12m">Ultimos 12 meses</option>
           <option value="year">Anio actual</option>
         </select>
       </div>
+      <div id="ventas-nota" style="font-size:12px;color:var(--text-2);margin:-4px 0 14px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;"></div>
       <div class="kpi-grid" id="kpi-ventas">
         <div class="kpi-card" id="v-ingreso"><div class="kpi-label">Ingreso Total</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Ingreso Total por Ventas</div><div class="tt-desc">Suma del valor de venta (campo price) de los lotes vendidos en el periodo.</div><div class="tt-calc">Calculo: Suma de price de eventos tipo venta.</div><div class="tt-ref">Solo cuenta ventas con precio cargado en Agriness.</div></div></div>
         <div class="kpi-card" id="v-cabezas"><div class="kpi-label">Cabezas Vendidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas</div><div class="tt-desc">Total de animales vendidos en el periodo (quantity).</div><div class="tt-calc">Calculo: Suma de quantity de eventos de venta.</div><div class="tt-ref">Incluye venta normal, descarte y seleccion.</div></div></div>
@@ -1734,16 +1736,29 @@ out.push({ month: period, value: k.value });
     internal_consumption: 'Consumo interno', pig_donation: 'Donacion', internal_replacement: 'Reposicion interna'
   };
   const VENTA_SALE_TYPES = ['sale', 'fallout_pig_sale', 'selection_sale'];
+  // Fecha desde la cual JOFA carga precios de venta en Agriness (10/06/2026).
+  // Antes de esta fecha solo hay 2 registros de prueba con valores irrisorios.
+  const VENTAS_PRICE_START = '2026-06-10';
 
   async function loadVentas() {
     const sel = document.getElementById('ventas-period');
-    const period = sel ? sel.value : '12m';
+    const period = sel ? sel.value : 'priceStart';
     const end = today();
     let start;
-    if (period === 'thismonth') start = monthStart(0);
+    if (period === 'priceStart') start = VENTAS_PRICE_START;
+    else if (period === 'thismonth') start = monthStart(0);
     else if (period === '3m') start = monthStart(-2);
     else if (period === 'year') start = new Date().getFullYear() + '-01-01';
     else start = monthStart(-11);
+
+    // Aclaracion visible sobre la carga de precios
+    const nota = document.getElementById('ventas-nota');
+    if (nota) {
+      nota.innerHTML = 'Los precios de venta se cargan en Agriness desde el <strong>' + fmtDate(VENTAS_PRICE_START) + '</strong>. '
+        + (period === 'priceStart'
+            ? 'Esta vista muestra las ventas desde esa fecha en adelante.'
+            : 'Las ventas anteriores a esa fecha pueden no tener precio cargado.');
+    }
 
     ['v-ingreso','v-cabezas','v-kg','v-prkg','v-prcab','v-pmedio'].forEach(id => {
       const c = document.getElementById(id); if (!c) return;
