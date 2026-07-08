@@ -251,6 +251,33 @@ exports.handler = async (event) => {
       case 'eventos':
         result = await makeRequest('POST', '/events-farm-sitio2-3-default/v1/events', params, authHeaders);
         break;
+      case 'salidas_lotes': {
+        // Listado de salidas de animales en lotes (ventas): price, supplier_name (comprador/frigorifico), invoice, DTA.
+        // La API de eventos requiere apikey (no acepta el Bearer OAuth). Probamos combinaciones de auth en cascada.
+        const outPath = '/events-farm-sitio2-3-default/v1/swine/farm/animal-group/output';
+        const baseGw = WSO2_API_KEY ? { apikey: WSO2_API_KEY } : { 'Authorization': 'Bearer ' + gatewayToken };
+        // Intento 1: apikey/gateway + token S4
+        const h1 = { 'Content-Type': 'application/json', ...baseGw };
+        if (s4AccessToken) h1['token'] = s4AccessToken;
+        result = await makeRequest('POST', outPath, params, h1);
+        // Intento 2: apikey + HTTP-AUTHORIZATION (token KPI)
+        if (result.status === 401 || result.status === 403) {
+          try {
+            const kt = await getKpiToken();
+            const h2 = { 'Content-Type': 'application/json', ...baseGw, 'HTTP-AUTHORIZATION': kt };
+            const r2 = await makeRequest('POST', outPath, params, h2);
+            if (r2.status !== 401 && r2.status !== 403) result = r2;
+            else {
+              // Intento 3: Bearer + token S4
+              const h3 = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + gatewayToken };
+              if (s4AccessToken) h3['token'] = s4AccessToken;
+              const r3 = await makeRequest('POST', outPath, params, h3);
+              if (r3.status !== 401 && r3.status !== 403) result = r3;
+            }
+          } catch (e) { console.error('salidas_lotes auth cascade error:', e.message); }
+        }
+        break;
+      }
       case 'raw': {
         // Exploratory: hit arbitrary sitio1 path
         const rawPath = (params && params.path) || '';
