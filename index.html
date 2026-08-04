@@ -659,7 +659,8 @@ body {
         <div class="kpi-card" id="kpi-r-ing-ventas"><div class="kpi-label">Ingreso Ventas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Ingreso por Ventas</div><div class="tt-desc">Suma del valor de venta (price) desde que se cargan precios en Agriness.</div><div class="tt-calc">Calculo: Suma de price de eventos de venta.</div><div class="tt-ref">Solo ventas con precio cargado.</div></div></div>
         <div class="kpi-card" id="kpi-r-cab-ventas"><div class="kpi-label">Cabezas Vendidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas</div><div class="tt-desc">Total de animales vendidos en el periodo.</div><div class="tt-calc">Calculo: Suma de quantity de eventos de venta.</div><div class="tt-ref">Incluye venta normal, descarte y seleccion.</div></div></div>
         <div class="kpi-card" id="kpi-r-prkg-ventas"><div class="kpi-label">$/kg Promedio</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Kilo</div><div class="tt-desc">Ingreso dividido por los kilos vendidos con precio.</div><div class="tt-calc">Calculo: Ingreso ÷ Kg (ventas con precio).</div><div class="tt-ref">Indicador clave de valor de venta.</div></div></div>
-        <div class="kpi-card" id="kpi-r-peso-ventas"><div class="kpi-label">Peso Medio Venta (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el periodo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
+        <div class="kpi-card" id="kpi-r-peso-ventas"><div class="kpi-label">Peso Medio Venta (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el mes, con alerta vs objetivo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
+        <div class="kpi-card" id="kpi-r-livianas"><div class="kpi-label">% Cabezas Livianas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas por Debajo del Piso</div><div class="tt-desc">Alerta: % de cabezas del mes vendidas en lotes por debajo del piso de peso.</div><div class="tt-calc">Calculo: Cabezas en lotes con peso &lt; piso ÷ Cabezas totales.</div><div class="tt-ref">Verde &lt;10% · Amarillo 10-30% · Rojo &gt;30%. Piso: 110 kg.</div></div></div>
       </div>
     </div>
     <!-- Inventario General -->
@@ -817,7 +818,8 @@ body {
         <div class="kpi-card" id="v-kg"><div class="kpi-label">Kg Vendidos</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Kilos Vendidos</div><div class="tt-desc">Peso total vendido en el periodo (total_weight).</div><div class="tt-calc">Calculo: Suma de total_weight de eventos de venta.</div><div class="tt-ref">Base para el calculo de $/kg.</div></div></div>
         <div class="kpi-card" id="v-prkg"><div class="kpi-label">$/kg Promedio</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Kilo</div><div class="tt-desc">Ingreso total dividido por los kilos vendidos con precio cargado.</div><div class="tt-calc">Calculo: Ingreso ÷ Kg (solo ventas con precio).</div><div class="tt-ref">Indicador clave de valor de venta.</div></div></div>
         <div class="kpi-card" id="v-prcab"><div class="kpi-label">$/Cabeza</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Cabeza</div><div class="tt-desc">Ingreso total dividido por las cabezas vendidas con precio cargado.</div><div class="tt-calc">Calculo: Ingreso ÷ Cabezas (solo ventas con precio).</div><div class="tt-ref">Ticket promedio por animal.</div></div></div>
-        <div class="kpi-card" id="v-pmedio"><div class="kpi-label">Peso Medio (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el periodo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
+        <div class="kpi-card" id="v-pmedio"><div class="kpi-label">Peso Medio (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el periodo, con alerta vs objetivo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
+        <div class="kpi-card" id="v-livianas"><div class="kpi-label">% Cabezas Livianas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas por Debajo del Piso</div><div class="tt-desc">Porcentaje de cabezas vendidas en lotes con peso medio menor al piso, para detectar ventas livianas (empujar volumen).</div><div class="tt-calc">Calculo: Cabezas en lotes con peso &lt; piso ÷ Cabezas totales.</div><div class="tt-ref">Verde &lt;10% · Amarillo 10-30% · Rojo &gt;30%. Piso: 110 kg.</div></div></div>
       </div>
     </div>
     <div class="section">
@@ -1569,7 +1571,7 @@ out.push({ month: period, value: k.value });
 
   // Cards de ventas para la pestania Resumen (mes en curso vs mes anterior, ventas reales)
   async function loadVentasResumen() {
-    const ids = ['kpi-r-ing-ventas','kpi-r-cab-ventas','kpi-r-prkg-ventas','kpi-r-peso-ventas'];
+    const ids = ['kpi-r-ing-ventas','kpi-r-cab-ventas','kpi-r-prkg-ventas','kpi-r-peso-ventas','kpi-r-livianas'];
     const mNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const now = new Date();
     const refMonth = curMonthStr();
@@ -1582,14 +1584,25 @@ out.push({ month: period, value: k.value });
       const reales = rows.filter(r => VENTA_SALE_TYPES.includes(r.event_type) && !esVentaInterna(r));
       const cur = aggVentas(reales.filter(r => String(r.event_date || '').slice(0, 7) === refMonth));
       const prev = aggVentas(reales.filter(r => String(r.event_date || '').slice(0, 7) === prevMonth));
+      const curReales = reales.filter(r => String(r.event_date || '').slice(0, 7) === refMonth);
+      const prevReales = reales.filter(r => String(r.event_date || '').slice(0, 7) === prevMonth);
+      const livCur = pctLivianas(curReales), livPrev = pctLivianas(prevReales);
       setKpi('kpi-r-ing-ventas', fmtMoneyShort(cur.ing), null, null, true);
       setKpi('kpi-r-cab-ventas', fmtInt(cur.cab), null, null, true);
       setKpi('kpi-r-prkg-ventas', cur.prkg != null ? fmtMoney(cur.prkg) : 's/precio', null, null, true);
-      setKpi('kpi-r-peso-ventas', cur.pmedio != null ? fmtNum(cur.pmedio, 1) + ' kg' : '--', null, null, true);
+      setKpi('kpi-r-peso-ventas', cur.pmedio != null ? fmtNum(cur.pmedio, 1) + ' kg' : '--', cur.pmedio != null ? VENTAS_PESO_OBJETIVO : null, 'Obj', true, ' kg');
+      setKpi('kpi-r-livianas', livCur.pct != null ? fmtNum(livCur.pct, 0) + '%' : '--', null, null, false);
+      const rlivCard = document.getElementById('kpi-r-livianas');
+      if (rlivCard) {
+        const vEl = rlivCard.querySelector('.kpi-value'); if (vEl) vEl.style.color = colorLivianas(livCur.pct);
+        const b = rlivCard.querySelector('.kpi-bench');
+        if (b) b.innerHTML = livCur.pct != null ? '<span style="font-size:11px;color:var(--text-3);">' + fmtInt(livCur.liv) + ' cab &lt; ' + VENTAS_PESO_MINIMO + ' kg</span>' : '';
+      }
       setVentaMoM('kpi-r-ing-ventas', cur.ing, prev.ing, true, fmtMoneyShort);
       setVentaMoM('kpi-r-cab-ventas', cur.cab, prev.cab, true, fmtInt);
       setVentaMoM('kpi-r-prkg-ventas', cur.prkg, prev.prkg, true, fmtMoney);
       setVentaMoM('kpi-r-peso-ventas', cur.pmedio, prev.pmedio, true, v => fmtNum(v, 1) + ' kg');
+      setVentaMoM('kpi-r-livianas', livCur.pct, livPrev.pct, false, v => fmtNum(v, 0) + '%');
     } catch (e) {
       ids.forEach(id => setKpiError(id, e.message));
     }
@@ -1783,6 +1796,27 @@ out.push({ month: period, value: k.value });
   // Movimientos internos (no son ventas reales a frigorifico): jofa sa, reposicion interna, etc.
   const VENTAS_INTERNO_RE = /(jofa|reposic|intern)/i;
   const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  // Control de peso de venta: objetivo y piso por debajo del cual una venta se considera "liviana".
+  const VENTAS_PESO_OBJETIVO = 115;   // kg objetivo de faena JOFA
+  const VENTAS_PESO_MINIMO = 110;     // kg: lotes con peso medio menor a esto = venta liviana (bandera)
+
+  // % de cabezas vendidas en lotes por debajo del piso de peso
+  function pctLivianas(list) {
+    let cab = 0, liv = 0;
+    list.forEach(r => {
+      const q = +r.quantity || 0;
+      const w = (r.average_weight != null && r.average_weight !== '') ? +r.average_weight
+        : ((+r.total_weight || 0) && q ? (+r.total_weight) / q : null);
+      cab += q;
+      if (w != null && w < VENTAS_PESO_MINIMO) liv += q;
+    });
+    return { cab: cab, liv: liv, pct: cab ? (liv / cab * 100) : null };
+  }
+  // Colorea el valor de una card segun umbrales (para % livianas: mas alto = peor)
+  function colorLivianas(pct) {
+    if (pct == null) return '';
+    return pct < 10 ? 'var(--green)' : (pct < 30 ? 'var(--yellow)' : 'var(--red)');
+  }
 
   function esVentaInterna(r) {
     const s = (r.supplier_name || '').trim();
@@ -1928,7 +1962,17 @@ out.push({ month: period, value: k.value });
     setKpi('v-kg', fmtInt(A.kg) + ' kg', null, null, true);
     setKpi('v-prkg', A.prkg != null ? fmtMoney(A.prkg) : 's/precio', null, null, true);
     setKpi('v-prcab', A.prcab != null ? fmtMoney(A.prcab) : 's/precio', null, null, true);
-    setKpi('v-pmedio', A.pmedio != null ? fmtNum(A.pmedio, 1) + ' kg' : '--', null, null, true);
+    // Peso medio con alerta vs objetivo (pill rojo/verde)
+    setKpi('v-pmedio', A.pmedio != null ? fmtNum(A.pmedio, 1) + ' kg' : '--', A.pmedio != null ? VENTAS_PESO_OBJETIVO : null, 'Obj', true, ' kg');
+    // % cabezas livianas (bandera automatica)
+    const liv = pctLivianas(ventas);
+    setKpi('v-livianas', liv.pct != null ? fmtNum(liv.pct, 0) + '%' : '--', null, null, false);
+    const livCard = document.getElementById('v-livianas');
+    if (livCard) {
+      const vEl = livCard.querySelector('.kpi-value'); if (vEl) vEl.style.color = colorLivianas(liv.pct);
+      const b = livCard.querySelector('.kpi-bench');
+      if (b) b.innerHTML = liv.pct != null ? '<span style="font-size:11px;color:var(--text-3);">' + fmtInt(liv.liv) + ' cab &lt; ' + VENTAS_PESO_MINIMO + ' kg</span>' : '';
+    }
 
     // Nota de precios en la card de ingreso
     const ingCard = document.getElementById('v-ingreso');
@@ -1949,6 +1993,7 @@ out.push({ month: period, value: k.value });
       setVentaMoM('v-prkg', A.prkg, P.prkg, true, fmtMoney);
       setVentaMoM('v-prcab', A.prcab, P.prcab, true, fmtMoney);
       setVentaMoM('v-pmedio', A.pmedio, P.pmedio, true, v => fmtNum(v, 1) + ' kg');
+      setVentaMoM('v-livianas', liv.pct, pctLivianas(prevReales).pct, false, v => fmtNum(v, 0) + '%');
     }
 
     // Por frigorifico (ventas reales)
