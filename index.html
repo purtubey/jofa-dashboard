@@ -660,7 +660,14 @@ body {
         <div class="kpi-card" id="kpi-r-cab-ventas"><div class="kpi-label">Cabezas Vendidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas</div><div class="tt-desc">Total de animales vendidos en el periodo.</div><div class="tt-calc">Calculo: Suma de quantity de eventos de venta.</div><div class="tt-ref">Incluye venta normal, descarte y seleccion.</div></div></div>
         <div class="kpi-card" id="kpi-r-prkg-ventas"><div class="kpi-label">$/kg Promedio</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Kilo</div><div class="tt-desc">Ingreso dividido por los kilos vendidos con precio.</div><div class="tt-calc">Calculo: Ingreso ÷ Kg (ventas con precio).</div><div class="tt-ref">Indicador clave de valor de venta.</div></div></div>
         <div class="kpi-card" id="kpi-r-peso-ventas"><div class="kpi-label">Peso Medio Venta (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el mes, con alerta vs objetivo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
-        <div class="kpi-card" id="kpi-r-livianas"><div class="kpi-label">% Cabezas Livianas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas por Debajo del Piso</div><div class="tt-desc">Alerta: % de cabezas del mes vendidas en lotes por debajo del piso de peso.</div><div class="tt-calc">Calculo: Cabezas en lotes con peso &lt; piso ÷ Cabezas totales.</div><div class="tt-ref">Verde &lt;10% · Amarillo 10-30% · Rojo &gt;30%. Piso: 110 kg.</div></div></div>
+        <div class="kpi-card kpi-expandable" id="kpi-r-livianas"><div class="kpi-label">% Cabezas Livianas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas por Debajo del Piso</div><div class="tt-desc">Alerta: % de cabezas del mes vendidas en lotes por debajo del piso de peso. Click para ver evolucion mensual.</div><div class="tt-calc">Calculo: Cabezas en lotes con peso &lt; piso ÷ Cabezas totales.</div><div class="tt-ref">Verde &lt;10% · Amarillo 10-30% · Rojo &gt;30%. Piso: 110 kg.</div></div></div>
+        <div class="expand-panel" id="panel-r-livianas">
+          <div class="stock-loading" id="panel-r-livianas-loading">Cargando evolucion mensual...</div>
+          <div id="panel-r-livianas-content" style="display:none;">
+            <h4>Evolucion mensual — Cabezas livianas (piso 110 kg)</h4>
+            <div id="panel-r-livianas-table"></div>
+          </div>
+        </div>
       </div>
     </div>
     <!-- Inventario General -->
@@ -819,7 +826,14 @@ body {
         <div class="kpi-card" id="v-prkg"><div class="kpi-label">$/kg Promedio</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Kilo</div><div class="tt-desc">Ingreso total dividido por los kilos vendidos con precio cargado.</div><div class="tt-calc">Calculo: Ingreso ÷ Kg (solo ventas con precio).</div><div class="tt-ref">Indicador clave de valor de venta.</div></div></div>
         <div class="kpi-card" id="v-prcab"><div class="kpi-label">$/Cabeza</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Precio Promedio por Cabeza</div><div class="tt-desc">Ingreso total dividido por las cabezas vendidas con precio cargado.</div><div class="tt-calc">Calculo: Ingreso ÷ Cabezas (solo ventas con precio).</div><div class="tt-ref">Ticket promedio por animal.</div></div></div>
         <div class="kpi-card" id="v-pmedio"><div class="kpi-label">Peso Medio (kg)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Peso Medio de Venta</div><div class="tt-desc">Peso promedio por animal vendido en el periodo, con alerta vs objetivo.</div><div class="tt-calc">Calculo: Kg vendidos ÷ Cabezas vendidas.</div><div class="tt-ref">Objetivo JOFA: ~115 kg.</div></div></div>
-        <div class="kpi-card" id="v-livianas"><div class="kpi-label">% Cabezas Livianas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas por Debajo del Piso</div><div class="tt-desc">Porcentaje de cabezas vendidas en lotes con peso medio menor al piso, para detectar ventas livianas (empujar volumen).</div><div class="tt-calc">Calculo: Cabezas en lotes con peso &lt; piso ÷ Cabezas totales.</div><div class="tt-ref">Verde &lt;10% · Amarillo 10-30% · Rojo &gt;30%. Piso: 110 kg.</div></div></div>
+        <div class="kpi-card kpi-expandable" id="v-livianas"><div class="kpi-label">% Cabezas Livianas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas por Debajo del Piso</div><div class="tt-desc">Porcentaje de cabezas vendidas en lotes con peso medio menor al piso, para detectar ventas livianas (empujar volumen). Click para ver evolucion mensual.</div><div class="tt-calc">Calculo: Cabezas en lotes con peso &lt; piso ÷ Cabezas totales.</div><div class="tt-ref">Verde &lt;10% · Amarillo 10-30% · Rojo &gt;30%. Piso: 110 kg.</div></div></div>
+        <div class="expand-panel" id="panel-v-livianas">
+          <div class="stock-loading" id="panel-v-livianas-loading">Cargando evolucion mensual...</div>
+          <div id="panel-v-livianas-content" style="display:none;">
+            <h4>Evolucion mensual — Cabezas livianas (piso 110 kg)</h4>
+            <div id="panel-v-livianas-table"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="section">
@@ -1896,6 +1910,63 @@ out.push({ month: period, value: k.value });
       + '<span style="color:var(--text-3);">' + det + '</span></div>';
   }
 
+  // Evolucion mensual de cabezas livianas (datos duros, tabla) para el panel expandible
+  const livianasPanelLoaded = {};
+  async function loadLivianasEvolucion(key) {
+    const loading = document.getElementById('panel-' + key + '-loading');
+    const cont = document.getElementById('panel-' + key + '-content');
+    const tblEl = document.getElementById('panel-' + key + '-table');
+    try {
+      const data = await fetchEvents('salidas_lotes', monthStart(-11), today());
+      const rows = Array.isArray(data) ? data : (data && (data.data || data.results)) || [];
+      const reales = rows.filter(r => VENTA_SALE_TYPES.includes(r.event_type) && !esVentaInterna(r));
+      const days = (a, b) => (a && b) ? (new Date(a) - new Date(b)) / 86400000 : null;
+      const M = {};
+      reales.forEach(r => {
+        const m = String(r.event_date || '').slice(0, 7); if (!m) return;
+        M[m] = M[m] || { cab: 0, kg: 0, liv: 0, ageW: 0, n: 0, ing: 0, kgP: 0 };
+        const q = +r.quantity || 0, w = +r.total_weight || 0;
+        const pw = (r.average_weight != null && r.average_weight !== '') ? +r.average_weight : (w && q ? w / q : null);
+        const ag = days(r.event_date, r.average_birthdate);
+        M[m].cab += q; M[m].kg += w; M[m].n++;
+        if (pw != null && pw < VENTAS_PESO_MINIMO) M[m].liv += q;
+        if (ag != null) M[m].ageW += ag * q;
+        const p = (r.price != null && r.price !== '') ? +r.price : null;
+        if (p != null && !isNaN(p)) { M[m].ing += p; M[m].kgP += w; }
+      });
+      const meses = Object.keys(M).sort().reverse(); // mas reciente primero
+      let h = '<table><thead><tr>'
+        + '<th>Mes</th><th style="text-align:right;">Cabezas</th><th style="text-align:right;">Kg</th>'
+        + '<th style="text-align:right;">Peso Med</th><th style="text-align:right;">Edad</th>'
+        + '<th style="text-align:right;">Livianas &lt;110</th><th style="text-align:right;">% Livianas</th><th style="text-align:right;">$/kg</th></tr></thead><tbody>';
+      meses.forEach(m => {
+        const x = M[m];
+        const peso = x.cab ? x.kg / x.cab : null;
+        const edad = x.cab ? x.ageW / x.cab : null;
+        const pct = x.cab ? x.liv / x.cab * 100 : null;
+        const prkg = x.kgP ? x.ing / x.kgP : null;
+        const col = colorLivianas(pct);
+        h += '<tr>'
+          + '<td>' + monthLabel(m + '-01') + '</td>'
+          + '<td style="text-align:right;">' + fmtInt(x.cab) + '</td>'
+          + '<td style="text-align:right;">' + fmtInt(x.kg) + '</td>'
+          + '<td style="text-align:right;">' + (peso != null ? fmtNum(peso, 1) : '--') + '</td>'
+          + '<td style="text-align:right;">' + (edad != null ? fmtNum(edad, 0) + ' d' : '--') + '</td>'
+          + '<td style="text-align:right;">' + fmtInt(x.liv) + '</td>'
+          + '<td style="text-align:right;font-weight:700;color:' + col + ';">' + (pct != null ? fmtNum(pct, 0) + '%' : '--') + '</td>'
+          + '<td style="text-align:right;">' + (prkg != null ? fmtMoney(prkg) : '--') + '</td>'
+          + '</tr>';
+      });
+      h += '</tbody></table>';
+      if (meses.length === 0) h = '<div class="table-empty">Sin ventas en los ultimos 12 meses</div>';
+      tblEl.innerHTML = h;
+      loading.style.display = 'none';
+      cont.style.display = 'block';
+    } catch (e) {
+      loading.textContent = 'Error: ' + e.message;
+    }
+  }
+
   async function loadVentas() {
     const sel = document.getElementById('ventas-period');
     const period = sel ? sel.value : 'priceStart';
@@ -2204,7 +2275,9 @@ out.push({ month: period, value: k.value });
     ]) },
     'kpi-peso-sal-r': { panel: 'panel-engorde', loader: () => loadEngordePanel() },
     'kpi-ult-entrega': { panel: 'panel-entregas', loader: () => loadEntregasPanel() },
-    'kpi-inv-total': { panel: 'panel-inv', loader: () => loadInventarioPanel() }
+    'kpi-inv-total': { panel: 'panel-inv', loader: () => loadInventarioPanel() },
+    'v-livianas': { panel: 'panel-v-livianas', loader: () => loadLivianasEvolucion('v-livianas') },
+    'kpi-r-livianas': { panel: 'panel-r-livianas', loader: () => loadLivianasEvolucion('r-livianas') }
   };
 
   // Generic click handler for all expandable cards
