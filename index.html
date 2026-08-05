@@ -819,6 +819,7 @@ body {
         </select>
       </div>
       <div id="ventas-nota" style="font-size:12px;color:var(--text-2);margin:-4px 0 14px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;"></div>
+      <div id="ventas-anomalias" style="display:none;"></div>
       <div class="kpi-grid" id="kpi-ventas">
         <div class="kpi-card" id="v-ingreso"><div class="kpi-label">Ingreso Total</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Ingreso Total por Ventas</div><div class="tt-desc">Suma del valor de venta (campo price) de los lotes vendidos en el periodo.</div><div class="tt-calc">Calculo: Suma de price de eventos tipo venta.</div><div class="tt-ref">Solo cuenta ventas con precio cargado en Agriness.</div></div></div>
         <div class="kpi-card" id="v-cabezas"><div class="kpi-label">Cabezas Vendidas</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Cabezas Vendidas</div><div class="tt-desc">Total de animales vendidos en el periodo (quantity).</div><div class="tt-calc">Calculo: Suma de quantity de eventos de venta.</div><div class="tt-ref">Incluye venta normal, descarte y seleccion.</div></div></div>
@@ -1813,6 +1814,10 @@ out.push({ month: period, value: k.value });
   // Control de peso de venta: objetivo y piso por debajo del cual una venta se considera "liviana".
   const VENTAS_PESO_OBJETIVO = 115;   // kg objetivo de faena JOFA
   const VENTAS_PESO_MINIMO = 110;     // kg: lotes con peso medio menor a esto = venta liviana (bandera)
+  // Deteccion de anomalias de $/kg (errores de carga de precio)
+  const VENTAS_PRKG_MIN_ABS = 500;    // $/kg por debajo de esto = claramente erroneo
+  const VENTAS_PRKG_LOW = 0.6;        // flag si $/kg < mediana * 0.6
+  const VENTAS_PRKG_HIGH = 1.7;       // flag si $/kg > mediana * 1.7
 
   // % de cabezas vendidas en lotes por debajo del piso de peso
   function pctLivianas(list) {
@@ -1897,6 +1902,61 @@ out.push({ month: period, value: k.value });
     if (opts.length) selp.insertAdjacentHTML('beforeend', '<option disabled>──── Mes puntual ────</option>' + opts.join(''));
   })();
 
+  // Detecta ventas con $/kg fuera de rango (errores de carga). Devuelve {flagged, median}.
+  function detectarAnomaliasPrkg(ventas) {
+    const conPrecio = ventas.filter(r => r.price != null && r.price !== '' && (+r.total_weight) > 0 && !isNaN(+r.price));
+    const prkgs = conPrecio.map(r => (+r.price) / (+r.total_weight)).sort((a, b) => a - b);
+    let median = null;
+    if (prkgs.length) { const mid = Math.floor(prkgs.length / 2); median = prkgs.length % 2 ? prkgs[mid] : (prkgs[mid - 1] + prkgs[mid]) / 2; }
+    const flagged = [];
+    conPrecio.forEach(r => {
+      const pk = (+r.price) / (+r.total_weight);
+      const fueraBanda = median ? (pk < median * VENTAS_PRKG_LOW || pk > median * VENTAS_PRKG_HIGH) : false;
+      if (pk < VENTAS_PRKG_MIN_ABS || fueraBanda) flagged.push({ r: r, prkg: pk });
+    });
+    flagged.sort((a, b) => a.prkg - b.prkg);
+    return { flagged, median, count: conPrecio.length };
+  }
+
+  function renderVentasAnomalias(id, flagged, median, count) {
+    const c = document.getElementById(id);
+    if (!c) return;
+    if (!flagged || flagged.length === 0) {
+      // Confirmacion verde de cierre cuando hay ventas con precio y ninguna anomalia
+      if (count > 0) {
+        c.style.display = 'block';
+        c.innerHTML = '<div style="background:var(--green-dim);border:1px solid var(--green);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--green);font-weight:600;">'
+          + String.fromCharCode(10003) + ' Precios OK: ' + count + ' venta(s) con precio, todas dentro de rango'
+          + (median != null ? ' (~' + fmtMoney(Math.round(median)) + '/kg)' : '') + '</div>';
+      } else { c.style.display = 'none'; c.innerHTML = ''; }
+      return;
+    }
+    c.style.display = 'block';
+    let h = '<div style="background:var(--red-dim);border:1px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:14px;">';
+    h += '<div style="font-weight:700;color:var(--red);margin-bottom:8px;">' + String.fromCharCode(9888) + ' ' + flagged.length + ' venta(s) con $/kg fuera de rango — revisar carga en Agriness</div>';
+    h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="color:var(--text-2);text-align:left;border-bottom:1px solid var(--red);">'
+      + '<th style="padding:4px 8px;">Fecha</th><th style="padding:4px 8px;">Lote</th><th style="padding:4px 8px;">Frigorifico</th>'
+      + '<th style="padding:4px 8px;text-align:right;">Cab</th><th style="padding:4px 8px;text-align:right;">Kg</th>'
+      + '<th style="padding:4px 8px;text-align:right;">Valor cargado</th><th style="padding:4px 8px;text-align:right;">$/kg</th>'
+      + '<th style="padding:4px 8px;text-align:right;">Valor esperado ~</th></tr></thead><tbody>';
+    flagged.forEach(f => {
+      const r = f.r, w = +r.total_weight || 0;
+      const esperado = (median != null && w) ? median * w : null;
+      h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<td style="padding:4px 8px;">' + fmtDate(r.event_date) + '</td>'
+        + '<td style="padding:4px 8px;">' + (r.animal_group_name || '--') + '</td>'
+        + '<td style="padding:4px 8px;">' + (r.supplier_name || '--') + '</td>'
+        + '<td style="padding:4px 8px;text-align:right;">' + fmtInt(r.quantity) + '</td>'
+        + '<td style="padding:4px 8px;text-align:right;">' + fmtInt(w) + '</td>'
+        + '<td style="padding:4px 8px;text-align:right;color:var(--red);font-weight:600;">' + fmtMoney(r.price) + '</td>'
+        + '<td style="padding:4px 8px;text-align:right;color:var(--red);font-weight:700;">' + fmtMoney(f.prkg) + '</td>'
+        + '<td style="padding:4px 8px;text-align:right;color:var(--text-3);">' + (esperado != null ? fmtMoneyShort(esperado) + ' (' + fmtMoney(Math.round(median)) + '/kg)' : '--') + '</td>'
+        + '</tr>';
+    });
+    h += '</tbody></table></div></div>';
+    c.innerHTML = h;
+  }
+
   function renderVentasInternos(id, list) {
     const c = document.getElementById(id);
     if (!c) return;
@@ -1934,31 +1994,60 @@ out.push({ month: period, value: k.value });
         const p = (r.price != null && r.price !== '') ? +r.price : null;
         if (p != null && !isNaN(p)) { M[m].ing += p; M[m].kgP += w; }
       });
-      const meses = Object.keys(M).sort().reverse(); // mas reciente primero
-      let h = '<table><thead><tr>'
-        + '<th>Mes</th><th style="text-align:right;">Cabezas</th><th style="text-align:right;">Kg</th>'
-        + '<th style="text-align:right;">Peso Med</th><th style="text-align:right;">Edad</th>'
-        + '<th style="text-align:right;">Livianas &lt;110</th><th style="text-align:right;">% Livianas</th><th style="text-align:right;">$/kg</th></tr></thead><tbody>';
-      meses.forEach(m => {
+      // Serie ascendente con delta vs mes anterior
+      const series = Object.keys(M).sort().map(m => {
         const x = M[m];
-        const peso = x.cab ? x.kg / x.cab : null;
-        const edad = x.cab ? x.ageW / x.cab : null;
-        const pct = x.cab ? x.liv / x.cab * 100 : null;
-        const prkg = x.kgP ? x.ing / x.kgP : null;
-        const col = colorLivianas(pct);
-        h += '<tr>'
-          + '<td>' + monthLabel(m + '-01') + '</td>'
-          + '<td style="text-align:right;">' + fmtInt(x.cab) + '</td>'
-          + '<td style="text-align:right;">' + fmtInt(x.kg) + '</td>'
-          + '<td style="text-align:right;">' + (peso != null ? fmtNum(peso, 1) : '--') + '</td>'
-          + '<td style="text-align:right;">' + (edad != null ? fmtNum(edad, 0) + ' d' : '--') + '</td>'
-          + '<td style="text-align:right;">' + fmtInt(x.liv) + '</td>'
-          + '<td style="text-align:right;font-weight:700;color:' + col + ';">' + (pct != null ? fmtNum(pct, 0) + '%' : '--') + '</td>'
-          + '<td style="text-align:right;">' + (prkg != null ? fmtMoney(prkg) : '--') + '</td>'
+        return { ym: m, cab: x.cab, kg: x.kg, liv: x.liv,
+          peso: x.cab ? x.kg / x.cab : null, edad: x.cab ? x.ageW / x.cab : null,
+          pct: x.cab ? x.liv / x.cab * 100 : null, prkg: x.kgP ? x.ing / x.kgP : null };
+      });
+      series.forEach((s, i) => { s.delta = (i > 0 && s.pct != null && series[i - 1].pct != null) ? (s.pct - series[i - 1].pct) : null; });
+      const cur = curMonthStr();
+      const upC = String.fromCharCode(9650), dnC = String.fromCharCode(9660);
+      const style = '<style>'
+        + '.liv-ev{width:100%;border-collapse:collapse;font-size:12.5px;}'
+        + '.liv-ev th{text-align:left;color:var(--text-2);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:1px solid var(--bg-3);white-space:nowrap;}'
+        + '.liv-ev td{padding:10px;border-bottom:1px solid var(--bg-2);color:var(--text-1);}'
+        + '.liv-ev tbody tr{transition:background .15s;}'
+        + '.liv-ev tbody tr:hover{background:var(--bg-2);}'
+        + '.liv-ev .num{text-align:right;font-variant-numeric:tabular-nums;}'
+        + '.liv-ev tr.cur{background:rgba(79,125,245,0.08);}'
+        + '.liv-ev tr.cur td:first-child{border-left:3px solid var(--blue);font-weight:700;}'
+        + '.liv-ev .tag{font-size:9px;color:var(--blue);font-weight:700;margin-left:6px;letter-spacing:.5px;}'
+        + '.liv-barwrap{display:flex;align-items:center;gap:9px;justify-content:flex-end;}'
+        + '.liv-track{flex:1;max-width:150px;height:8px;background:var(--bg-3);border-radius:5px;overflow:hidden;}'
+        + '.liv-fill{height:100%;border-radius:5px;transition:width .3s;}'
+        + '.liv-pct{min-width:34px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;}'
+        + '.liv-delta{min-width:40px;text-align:right;font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums;}'
+        + '</style>';
+      let body = '';
+      series.slice().reverse().forEach(s => {
+        const col = colorLivianas(s.pct);
+        const isCur = s.ym === cur;
+        const pesoStyle = (s.peso != null && s.peso < VENTAS_PESO_MINIMO) ? 'color:var(--red);font-weight:600;' : '';
+        let deltaHtml = '<span class="liv-delta" style="color:var(--text-3);">&ndash;</span>';
+        if (s.delta != null && Math.round(s.delta) !== 0) {
+          const up = s.delta > 0;
+          deltaHtml = '<span class="liv-delta" style="color:' + (up ? 'var(--red)' : 'var(--green)') + ';">' + (up ? upC : dnC) + ' ' + Math.abs(Math.round(s.delta)) + '</span>';
+        } else if (s.delta != null) {
+          deltaHtml = '<span class="liv-delta" style="color:var(--text-3);">=</span>';
+        }
+        const barW = s.pct != null ? Math.min(100, Math.round(s.pct)) : 0;
+        body += '<tr' + (isCur ? ' class="cur"' : '') + '>'
+          + '<td>' + monthLabel(s.ym + '-01') + (isCur ? '<span class="tag">ACTUAL</span>' : '') + '</td>'
+          + '<td class="num">' + fmtInt(s.cab) + '</td>'
+          + '<td class="num">' + fmtInt(s.kg) + '</td>'
+          + '<td class="num" style="' + pesoStyle + '">' + (s.peso != null ? fmtNum(s.peso, 1) : '--') + '</td>'
+          + '<td class="num">' + (s.edad != null ? fmtNum(s.edad, 0) + ' d' : '--') + '</td>'
+          + '<td class="num">' + fmtInt(s.liv) + '</td>'
+          + '<td><div class="liv-barwrap"><div class="liv-track"><div class="liv-fill" style="width:' + barW + '%;background:' + col + ';"></div></div><span class="liv-pct" style="color:' + col + ';">' + (s.pct != null ? Math.round(s.pct) + '%' : '--') + '</span>' + deltaHtml + '</div></td>'
+          + '<td class="num">' + (s.prkg != null ? fmtMoney(s.prkg) : '--') + '</td>'
           + '</tr>';
       });
-      h += '</tbody></table>';
-      if (meses.length === 0) h = '<div class="table-empty">Sin ventas en los ultimos 12 meses</div>';
+      const leyenda = '<div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Semaforo % livianas: <span style="color:var(--green);font-weight:600;">&lt;10%</span> &middot; <span style="color:var(--yellow);font-weight:600;">10-30%</span> &middot; <span style="color:var(--red);font-weight:600;">&gt;30%</span> &middot; piso 110 kg. Flecha = variacion en puntos vs mes anterior.</div>';
+      const h = series.length === 0
+        ? '<div class="table-empty">Sin ventas en los ultimos 12 meses</div>'
+        : style + leyenda + '<div style="overflow-x:auto;"><table class="liv-ev"><thead><tr><th>Mes</th><th class="num">Cabezas</th><th class="num">Kg</th><th class="num">Peso</th><th class="num">Edad</th><th class="num">Livianas</th><th style="min-width:210px;">% Cabezas Livianas</th><th class="num">$/kg</th></tr></thead><tbody>' + body + '</tbody></table></div>';
       tblEl.innerHTML = h;
       loading.style.display = 'none';
       cont.style.display = 'block';
@@ -2003,6 +2092,7 @@ out.push({ month: period, value: k.value });
       const b = c.querySelector('.kpi-bench'); if (b) b.innerHTML = '';
     });
     clearVentaMoM();
+    document.getElementById('ventas-anomalias').style.display = 'none';
     document.getElementById('ventas-frig').innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Cargando...</div>';
     document.getElementById('ventas-internos').innerHTML = '';
     document.getElementById('ventas-evol').innerHTML = '<div class="loading-overlay"><div class="spinner"></div></div>';
@@ -2082,6 +2172,10 @@ out.push({ month: period, value: k.value });
 
     // Internos aparte
     renderVentasInternos('ventas-internos', internos);
+
+    // Detector de anomalias de $/kg (errores de carga)
+    const anom = detectarAnomaliasPrkg(ventas);
+    renderVentasAnomalias('ventas-anomalias', anom.flagged, anom.median, anom.count);
 
     // Evolucion mensual (ventas reales)
     const byM = {};
