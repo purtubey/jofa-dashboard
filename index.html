@@ -477,6 +477,7 @@ body {
   <div class="header-status">
     <div class="status-dot" id="statusDot"></div>
     <span id="statusText">Verificando conexion...</span>
+    <a href="/__logout" title="Cerrar sesion" style="margin-left:14px;color:var(--text-3);font-size:12px;text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:7px;">Salir</a>
   </div>
 </header>
 
@@ -650,6 +651,7 @@ body {
             <div id="panel-entregas-chart" style="min-height:180px;margin-top:16px;"></div>
           </div>
         </div>
+        <div class="kpi-card" id="kpi-margen-repo"><div class="kpi-label">Margen Venta Sostenible</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Margen de Venta Sostenible</div><div class="tt-desc">Cuantas cabezas de mas o de menos vendes por mes respecto al techo que mantiene la reposicion en cero. Verde = margen para vender; Rojo = estas sobrevendiendo (reposicion negativa).</div><div class="tt-calc">Calculo: (Ingresos a engorde - Muertes) - Ventas, promedio de los ultimos 3 meses consolidados.</div><div class="tt-ref">Techo sostenible = Ingresos - Muertes. Vender por encima vacia stock.</div></div></div>
       </div>
     </div>
     <!-- Ventas -->
@@ -1582,6 +1584,32 @@ out.push({ month: period, value: k.value });
 
     // Cards de ventas en el resumen (desde carga de precios)
     loadVentasResumen();
+    // Margen de venta sostenible (reposicion)
+    loadMargenReposicion();
+  }
+
+  // Margen de venta sostenible: (Ingresos a engorde - Muertes) - Ventas, promedio 3 meses consolidados.
+  async function loadMargenReposicion() {
+    try {
+      const flow = await fetchKpis('sitio3', ['TOTAL_ANIMAL_INPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_DEATHS_INPLACE'], monthStart(-4), today(), 'reference_date');
+      const months = (flow && flow.data) ? flow.data : [];
+      // Solo meses consolidados (con ingresos > 0), tomar los ultimos 3
+      const cons = months.filter(m => (m.kpis && m.kpis.TOTAL_ANIMAL_INPUT_STAGE || 0) > 0).slice(-3);
+      if (cons.length === 0) { setKpi('kpi-margen-repo', 's/d', null, null, true); return; }
+      let ing = 0, sal = 0, mrt = 0;
+      cons.forEach(m => { const k = m.kpis || {}; ing += k.TOTAL_ANIMAL_INPUT_STAGE || 0; sal += k.TOTAL_ANIMAL_OUTPUT_STAGE || 0; mrt += k.TOTAL_DEATHS_INPLACE || 0; });
+      const n = cons.length;
+      const techo = (ing - mrt) / n;   // techo sostenible por mes
+      const ventas = sal / n;          // ventas por mes
+      const margen = techo - ventas;   // = balance de reposicion por mes
+      setKpi('kpi-margen-repo', (margen >= 0 ? '+' : '') + fmtInt(margen) + ' /mes', null, null, true);
+      const card = document.getElementById('kpi-margen-repo');
+      if (card) {
+        const vEl = card.querySelector('.kpi-value'); if (vEl) vEl.style.color = margen >= 0 ? 'var(--green)' : 'var(--red)';
+        const b = card.querySelector('.kpi-bench');
+        if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Techo ' + fmtInt(techo) + ' &middot; Vendido ' + fmtInt(ventas) + ' (prom ' + n + 'M)</span>';
+      }
+    } catch (e) { setKpiError('kpi-margen-repo', e.message); }
   }
 
   // Cards de ventas para la pestania Resumen (mes en curso vs mes anterior, ventas reales)
