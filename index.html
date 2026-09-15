@@ -651,7 +651,7 @@ body {
             <div id="panel-entregas-chart" style="min-height:180px;margin-top:16px;"></div>
           </div>
         </div>
-        <div class="kpi-card" id="kpi-margen-repo"><div class="kpi-label">Margen Venta Sostenible</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Margen de Venta Sostenible</div><div class="tt-desc">Cuantas cabezas de mas o de menos vendes por mes respecto al techo que mantiene la reposicion en cero. Verde = margen para vender; Rojo = estas sobrevendiendo (reposicion negativa).</div><div class="tt-calc">Calculo: (Ingresos a engorde - Muertes) - Ventas, promedio de los ultimos 3 meses consolidados.</div><div class="tt-ref">Techo sostenible = Ingresos - Muertes. Vender por encima vacia stock.</div></div></div>
+        <div class="kpi-card" id="kpi-margen-repo"><div class="kpi-label">Margen Venta Sostenible</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Margen de Venta Sostenible</div><div class="tt-desc">Cuantas cabezas de mas o de menos vendes por mes respecto al techo que mantiene la reposicion en cero. Verde = margen para vender; Rojo = estas sobrevendiendo (reposicion negativa).</div><div class="tt-calc">Techo = Ingresos a engorde - Muertes - Reposicion interna. Margen = Techo - Ventas a frigorifico. Promedio 3 meses consolidados. La reposicion interna (animales que dejan engorde para el plantel) se descuenta del techo, no cuenta como venta.</div><div class="tt-ref">Vender por encima del techo vacia stock.</div></div></div>
       </div>
     </div>
     <!-- Ventas -->
@@ -1588,26 +1588,42 @@ out.push({ month: period, value: k.value });
     loadMargenReposicion();
   }
 
-  // Margen de venta sostenible: (Ingresos a engorde - Muertes) - Ventas, promedio 3 meses consolidados.
+  // Margen de venta sostenible (engorde). Techo = Ingresos - Muertes - Reposicion interna; se compara vs Venta pura a frigorifico.
+  // La reposicion interna (animales que salen de engorde hacia el plantel) se descuenta del techo, no se cuenta como venta.
   async function loadMargenReposicion() {
     try {
-      const flow = await fetchKpis('sitio3', ['TOTAL_ANIMAL_INPUT_STAGE','TOTAL_ANIMAL_OUTPUT_STAGE','TOTAL_DEATHS_INPLACE'], monthStart(-4), today(), 'reference_date');
+      const start = monthStart(-4), end = today();
+      const [flow, salidas] = await Promise.all([
+        fetchKpis('sitio3', ['TOTAL_ANIMAL_INPUT_STAGE','TOTAL_DEATHS_INPLACE'], start, end, 'reference_date'),
+        fetchEvents('salidas_lotes', start, end)
+      ]);
       const months = (flow && flow.data) ? flow.data : [];
-      // Solo meses consolidados (con ingresos > 0), tomar los ultimos 3
       const cons = months.filter(m => (m.kpis && m.kpis.TOTAL_ANIMAL_INPUT_STAGE || 0) > 0).slice(-3);
       if (cons.length === 0) { setKpi('kpi-margen-repo', 's/d', null, null, true); return; }
-      let ing = 0, sal = 0, mrt = 0;
-      cons.forEach(m => { const k = m.kpis || {}; ing += k.TOTAL_ANIMAL_INPUT_STAGE || 0; sal += k.TOTAL_ANIMAL_OUTPUT_STAGE || 0; mrt += k.TOTAL_DEATHS_INPLACE || 0; });
+      const consSet = new Set(cons.map(m => m.key));
+      let ing = 0, mrt = 0;
+      cons.forEach(m => { const k = m.kpis || {}; ing += k.TOTAL_ANIMAL_INPUT_STAGE || 0; mrt += k.TOTAL_DEATHS_INPLACE || 0; });
+      // Ventas y reposicion interna de ENGORDE (finishing), solo meses consolidados
+      const rows = Array.isArray(salidas) ? salidas : (salidas && (salidas.data || salidas.results)) || [];
+      let ventas = 0, repos = 0;
+      rows.forEach(x => {
+        if (x.stage !== 'finishing') return;
+        if (!consSet.has(String(x.event_date || '').slice(0, 7))) return;
+        const q = +x.quantity || 0;
+        if (x.event_type === 'internal_replacement') repos += q;
+        else if (['sale','fallout_pig_sale','selection_sale'].includes(x.event_type)) ventas += q;
+      });
       const n = cons.length;
-      const techo = (ing - mrt) / n;   // techo sostenible por mes
-      const ventas = sal / n;          // ventas por mes
-      const margen = techo - ventas;   // = balance de reposicion por mes
+      const techo = (ing - mrt - repos) / n;   // techo sostenible de VENTA por mes
+      const ventasM = ventas / n;
+      const reposM = repos / n;
+      const margen = techo - ventasM;
       setKpi('kpi-margen-repo', (margen >= 0 ? '+' : '') + fmtInt(margen) + ' /mes', null, null, true);
       const card = document.getElementById('kpi-margen-repo');
       if (card) {
         const vEl = card.querySelector('.kpi-value'); if (vEl) vEl.style.color = margen >= 0 ? 'var(--green)' : 'var(--red)';
         const b = card.querySelector('.kpi-bench');
-        if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Techo ' + fmtInt(techo) + ' &middot; Vendido ' + fmtInt(ventas) + ' (prom ' + n + 'M)</span>';
+        if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Techo ' + fmtInt(techo) + ' &middot; Vendido ' + fmtInt(ventasM) + ' &middot; Rep.int ' + fmtInt(reposM) + ' (prom ' + n + 'M)</span>';
       }
     } catch (e) { setKpiError('kpi-margen-repo', e.message); }
   }
@@ -1843,9 +1859,10 @@ out.push({ month: period, value: k.value });
   const VENTAS_PESO_OBJETIVO = 115;   // kg objetivo de faena JOFA
   const VENTAS_PESO_MINIMO = 110;     // kg: lotes con peso medio menor a esto = venta liviana (bandera)
   // Deteccion de anomalias de $/kg (errores de carga de precio)
-  const VENTAS_PRKG_MIN_ABS = 500;    // $/kg por debajo de esto = claramente erroneo
-  const VENTAS_PRKG_LOW = 0.6;        // flag si $/kg < mediana * 0.6
-  const VENTAS_PRKG_HIGH = 1.7;       // flag si $/kg > mediana * 1.7
+  const VENTAS_PRKG_MIN_ABS = 500;    // $/kg por debajo de esto = claramente erroneo (error de carga)
+  const VENTAS_PRKG_LOW = 0.5;        // flag si $/kg < referencia * 0.5
+  const VENTAS_PRKG_HIGH = 2.0;       // flag si $/kg > referencia * 2.0
+  const VENTAS_PRKG_REF_N = 12;       // referencia = mediana movil de las ultimas N ventas con precio (sigue la tendencia)
 
   // % de cabezas vendidas en lotes por debajo del piso de peso
   function pctLivianas(list) {
@@ -1931,19 +1948,31 @@ out.push({ month: period, value: k.value });
   })();
 
   // Detecta ventas con $/kg fuera de rango (errores de carga). Devuelve {flagged, median}.
-  function detectarAnomaliasPrkg(ventas) {
-    const conPrecio = ventas.filter(r => r.price != null && r.price !== '' && (+r.total_weight) > 0 && !isNaN(+r.price));
-    const prkgs = conPrecio.map(r => (+r.price) / (+r.total_weight)).sort((a, b) => a - b);
-    let median = null;
-    if (prkgs.length) { const mid = Math.floor(prkgs.length / 2); median = prkgs.length % 2 ? prkgs[mid] : (prkgs[mid - 1] + prkgs[mid]) / 2; }
+  function medianOf(arr) {
+    if (!arr.length) return null;
+    const s = arr.slice().sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+  }
+  // Detecta ventas con $/kg fuera de rango. La referencia es una MEDIANA MOVIL de las ultimas
+  // ventas con precio (sigue la tendencia del precio), no la mediana de todo el periodo.
+  // refPool: universo (idealmente reciente y amplio) para calcular la referencia; cae a 'ventas' si no viene.
+  function detectarAnomaliasPrkg(ventas, refPool) {
+    const priced = (r) => r.price != null && r.price !== '' && (+r.total_weight) > 0 && !isNaN(+r.price);
+    const conPrecio = ventas.filter(priced);
+    // Referencia = mediana de las ultimas N ventas con precio (por fecha) del pool
+    const pool = ((refPool && refPool.length) ? refPool : ventas).filter(priced)
+      .slice().sort((a, b) => String(a.event_date || '').localeCompare(String(b.event_date || '')));
+    const recientes = pool.slice(-VENTAS_PRKG_REF_N).map(r => (+r.price) / (+r.total_weight));
+    const ref = medianOf(recientes);
     const flagged = [];
     conPrecio.forEach(r => {
       const pk = (+r.price) / (+r.total_weight);
-      const fueraBanda = median ? (pk < median * VENTAS_PRKG_LOW || pk > median * VENTAS_PRKG_HIGH) : false;
+      const fueraBanda = ref ? (pk < ref * VENTAS_PRKG_LOW || pk > ref * VENTAS_PRKG_HIGH) : false;
       if (pk < VENTAS_PRKG_MIN_ABS || fueraBanda) flagged.push({ r: r, prkg: pk });
     });
     flagged.sort((a, b) => a.prkg - b.prkg);
-    return { flagged, median, count: conPrecio.length };
+    return { flagged, median: ref, count: conPrecio.length };
   }
 
   function renderVentasAnomalias(id, flagged, median, count) {
@@ -2201,8 +2230,10 @@ out.push({ month: period, value: k.value });
     // Internos aparte
     renderVentasInternos('ventas-internos', internos);
 
-    // Detector de anomalias de $/kg (errores de carga)
-    const anom = detectarAnomaliasPrkg(ventas);
+    // Detector de anomalias de $/kg (errores de carga). La referencia sigue la tendencia:
+    // mediana movil de las ultimas ventas reales del universo consultado (allVentas), no solo la vista.
+    const allReales = allVentas.filter(r => !esVentaInterna(r));
+    const anom = detectarAnomaliasPrkg(ventas, allReales);
     renderVentasAnomalias('ventas-anomalias', anom.flagged, anom.median, anom.count);
 
     // Evolucion mensual (ventas reales)
