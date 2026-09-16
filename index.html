@@ -1859,10 +1859,10 @@ out.push({ month: period, value: k.value });
   const VENTAS_PESO_OBJETIVO = 115;   // kg objetivo de faena JOFA
   const VENTAS_PESO_MINIMO = 110;     // kg: lotes con peso medio menor a esto = venta liviana (bandera)
   // Deteccion de anomalias de $/kg (errores de carga de precio)
-  const VENTAS_PRKG_MIN_ABS = 500;    // $/kg por debajo de esto = claramente erroneo (error de carga)
-  const VENTAS_PRKG_LOW = 0.5;        // flag si $/kg < referencia * 0.5
-  const VENTAS_PRKG_HIGH = 2.0;       // flag si $/kg > referencia * 2.0
-  const VENTAS_PRKG_REF_N = 12;       // referencia = mediana movil de las ultimas N ventas con precio (sigue la tendencia)
+  const VENTAS_PRKG_MIN_ABS = 500;        // $/kg por debajo de esto = error de carga grueso (divide por 10)
+  const VENTAS_PRECIO_PORMAG = 2250;      // PISO $/kg de referencia PORMAG para terminados. ACTUALIZAR cuando cambie el precio.
+  const VENTAS_PESO_TERMINADO = 90;       // kg: a partir de este peso se considera terminado y aplica el piso PORMAG
+  const VENTAS_PRKG_TOLERANCIA = 0.98;    // margen (2%) por redondeo antes de marcar bajo piso
 
   // % de cabezas vendidas en lotes por debajo del piso de peso
   function pctLivianas(list) {
@@ -1954,28 +1954,29 @@ out.push({ month: period, value: k.value });
     const mid = Math.floor(s.length / 2);
     return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
   }
-  // Detecta ventas con $/kg fuera de rango. La referencia es una MEDIANA MOVIL de las ultimas
-  // ventas con precio (sigue la tendencia del precio), no la mediana de todo el periodo.
-  // refPool: universo (idealmente reciente y amplio) para calcular la referencia; cae a 'ventas' si no viene.
-  function detectarAnomaliasPrkg(ventas, refPool) {
+  // Detecta ventas con $/kg fuera de rango.
+  // Regla de negocio: un TERMINADO (peso >= VENTAS_PESO_TERMINADO) no se vende por debajo del piso PORMAG.
+  // Animales mas livianos (descartes, etc.) quedan exentos del piso. Ademas se cazan errores gruesos de carga.
+  function detectarAnomaliasPrkg(ventas) {
     const priced = (r) => r.price != null && r.price !== '' && (+r.total_weight) > 0 && !isNaN(+r.price);
     const conPrecio = ventas.filter(priced);
-    // Referencia = mediana de las ultimas N ventas con precio (por fecha) del pool
-    const pool = ((refPool && refPool.length) ? refPool : ventas).filter(priced)
-      .slice().sort((a, b) => String(a.event_date || '').localeCompare(String(b.event_date || '')));
-    const recientes = pool.slice(-VENTAS_PRKG_REF_N).map(r => (+r.price) / (+r.total_weight));
-    const ref = medianOf(recientes);
+    const piso = VENTAS_PRECIO_PORMAG;
     const flagged = [];
     conPrecio.forEach(r => {
       const pk = (+r.price) / (+r.total_weight);
-      const fueraBanda = ref ? (pk < ref * VENTAS_PRKG_LOW || pk > ref * VENTAS_PRKG_HIGH) : false;
-      if (pk < VENTAS_PRKG_MIN_ABS || fueraBanda) flagged.push({ r: r, prkg: pk });
+      const w = (+r.total_weight) / (+r.quantity || 1);
+      const esTerminado = w >= VENTAS_PESO_TERMINADO;
+      let motivo = null;
+      if (pk < VENTAS_PRKG_MIN_ABS) motivo = 'error';                         // error grueso (÷10)
+      else if (pk > piso * 2.5) motivo = 'error';                             // error grueso alto (×10)
+      else if (esTerminado && pk < piso * VENTAS_PRKG_TOLERANCIA) motivo = 'pormag'; // terminado bajo piso PORMAG
+      if (motivo) flagged.push({ r: r, prkg: pk, peso: w, motivo: motivo });
     });
     flagged.sort((a, b) => a.prkg - b.prkg);
-    return { flagged, median: ref, count: conPrecio.length };
+    return { flagged, piso: piso, count: conPrecio.length };
   }
 
-  function renderVentasAnomalias(id, flagged, median, count) {
+  function renderVentasAnomalias(id, flagged, piso, count) {
     const c = document.getElementById(id);
     if (!c) return;
     if (!flagged || flagged.length === 0) {
@@ -1983,31 +1984,30 @@ out.push({ month: period, value: k.value });
       if (count > 0) {
         c.style.display = 'block';
         c.innerHTML = '<div style="background:var(--green-dim);border:1px solid var(--green);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--green);font-weight:600;">'
-          + String.fromCharCode(10003) + ' Precios OK: ' + count + ' venta(s) con precio, todas dentro de rango'
-          + (median != null ? ' (~' + fmtMoney(Math.round(median)) + '/kg)' : '') + '</div>';
+          + String.fromCharCode(10003) + ' Precios OK: ' + count + ' venta(s) con precio, terminados por encima del piso PORMAG (' + fmtMoney(piso) + '/kg)</div>';
       } else { c.style.display = 'none'; c.innerHTML = ''; }
       return;
     }
     c.style.display = 'block';
     let h = '<div style="background:var(--red-dim);border:1px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:14px;">';
-    h += '<div style="font-weight:700;color:var(--red);margin-bottom:8px;">' + String.fromCharCode(9888) + ' ' + flagged.length + ' venta(s) con $/kg fuera de rango — revisar carga en Agriness</div>';
+    h += '<div style="font-weight:700;color:var(--red);margin-bottom:8px;">' + String.fromCharCode(9888) + ' ' + flagged.length + ' venta(s) a revisar &mdash; terminado por debajo del piso PORMAG (' + fmtMoney(piso) + '/kg) o error de carga</div>';
     h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="color:var(--text-2);text-align:left;border-bottom:1px solid var(--red);">'
       + '<th style="padding:4px 8px;">Fecha</th><th style="padding:4px 8px;">Lote</th><th style="padding:4px 8px;">Frigorifico</th>'
-      + '<th style="padding:4px 8px;text-align:right;">Cab</th><th style="padding:4px 8px;text-align:right;">Kg</th>'
-      + '<th style="padding:4px 8px;text-align:right;">Valor cargado</th><th style="padding:4px 8px;text-align:right;">$/kg</th>'
-      + '<th style="padding:4px 8px;text-align:right;">Valor esperado ~</th></tr></thead><tbody>';
+      + '<th style="padding:4px 8px;text-align:right;">Cab</th><th style="padding:4px 8px;text-align:right;">Peso</th><th style="padding:4px 8px;text-align:right;">$/kg</th>'
+      + '<th style="padding:4px 8px;">Motivo</th><th style="padding:4px 8px;text-align:right;">Valor esperado ~</th></tr></thead><tbody>';
     flagged.forEach(f => {
       const r = f.r, w = +r.total_weight || 0;
-      const esperado = (median != null && w) ? median * w : null;
+      const esperado = w ? piso * w : null;
+      const motivoTxt = f.motivo === 'pormag' ? 'Terminado &lt; PORMAG' : 'Posible error de carga';
       h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
         + '<td style="padding:4px 8px;">' + fmtDate(r.event_date) + '</td>'
         + '<td style="padding:4px 8px;">' + (r.animal_group_name || '--') + '</td>'
         + '<td style="padding:4px 8px;">' + (r.supplier_name || '--') + '</td>'
         + '<td style="padding:4px 8px;text-align:right;">' + fmtInt(r.quantity) + '</td>'
-        + '<td style="padding:4px 8px;text-align:right;">' + fmtInt(w) + '</td>'
-        + '<td style="padding:4px 8px;text-align:right;color:var(--red);font-weight:600;">' + fmtMoney(r.price) + '</td>'
+        + '<td style="padding:4px 8px;text-align:right;">' + (f.peso != null ? fmtNum(f.peso, 1) + ' kg' : '--') + '</td>'
         + '<td style="padding:4px 8px;text-align:right;color:var(--red);font-weight:700;">' + fmtMoney(f.prkg) + '</td>'
-        + '<td style="padding:4px 8px;text-align:right;color:var(--text-3);">' + (esperado != null ? fmtMoneyShort(esperado) + ' (' + fmtMoney(Math.round(median)) + '/kg)' : '--') + '</td>'
+        + '<td style="padding:4px 8px;color:var(--text-2);">' + motivoTxt + '</td>'
+        + '<td style="padding:4px 8px;text-align:right;color:var(--text-3);">' + (esperado != null ? '&ge; ' + fmtMoneyShort(esperado) : '--') + '</td>'
         + '</tr>';
     });
     h += '</tbody></table></div></div>';
@@ -2139,8 +2139,9 @@ out.push({ month: period, value: k.value });
     if (nota) {
       nota.innerHTML = 'Precios de venta cargados en Agriness desde el <strong>' + fmtDate(VENTAS_PRICE_START) + '</strong>. '
         + (isSingle
-            ? 'Comparativo <strong>vs mes anterior</strong> en las tarjetas. Movimientos internos (jofa sa, reposicion interna) se muestran aparte.'
-            : 'Movimientos internos (jofa sa, reposicion interna) se muestran aparte, fuera de los totales.');
+            ? 'Comparativo <strong>vs mes anterior</strong> en las tarjetas. Movimientos internos (jofa sa, reposicion interna) se muestran aparte. '
+            : 'Movimientos internos (jofa sa, reposicion interna) se muestran aparte, fuera de los totales. ')
+        + 'Piso PORMAG terminados: <strong>' + fmtMoney(VENTAS_PRECIO_PORMAG) + '/kg</strong> (actualizar en el codigo cuando cambie).';
     }
 
     ['v-ingreso','v-cabezas','v-kg','v-prkg','v-prcab','v-pmedio'].forEach(id => {
@@ -2230,11 +2231,9 @@ out.push({ month: period, value: k.value });
     // Internos aparte
     renderVentasInternos('ventas-internos', internos);
 
-    // Detector de anomalias de $/kg (errores de carga). La referencia sigue la tendencia:
-    // mediana movil de las ultimas ventas reales del universo consultado (allVentas), no solo la vista.
-    const allReales = allVentas.filter(r => !esVentaInterna(r));
-    const anom = detectarAnomaliasPrkg(ventas, allReales);
-    renderVentasAnomalias('ventas-anomalias', anom.flagged, anom.median, anom.count);
+    // Detector de anomalias de $/kg: terminado por debajo del piso PORMAG o error de carga.
+    const anom = detectarAnomaliasPrkg(ventas);
+    renderVentasAnomalias('ventas-anomalias', anom.flagged, anom.piso, anom.count);
 
     // Evolucion mensual (ventas reales)
     const byM = {};
