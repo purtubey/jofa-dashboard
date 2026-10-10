@@ -59,6 +59,28 @@ function makeRequest(method, path, body, headers, port) {
   });
 }
 
+// ---- Compras: baja el CSV de facturas de compra desde Google Drive (Smart ARCA / Pymetech) ----
+// Archivo publico (anyone-with-link), se reemplaza a diario 07:30 ARG. Devolvemos el texto crudo.
+const COMPRAS_CSV_ID = process.env.COMPRAS_CSV_ID || '1zEc1FIltSoRfW8lBhnlX_TsiZMbjtCni';
+function fetchExternal(url, redirects) {
+  redirects = redirects || 0;
+  return new Promise((resolve, reject) => {
+    if (redirects > 6) return reject(new Error('Too many redirects'));
+    const req = https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (JofaDashboard)' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        const next = res.headers.location.startsWith('http') ? res.headers.location : new URL(res.headers.location, url).href;
+        return resolve(fetchExternal(next, redirects + 1));
+      }
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => resolve({ status: res.statusCode, data: data }));
+    });
+    req.on('error', reject);
+    req.setTimeout(25000, () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
 async function getWso2Token() {
   if (wso2Token && Date.now() < wso2TokenExpiry) return wso2Token;
 
@@ -188,6 +210,24 @@ exports.handler = async (event) => {
 
     const body = event.body ? JSON.parse(event.body) : {};
     const { action, params } = body;
+
+    // Compras: baja el CSV de Drive y lo devuelve crudo (no requiere auth de Agriness)
+    if (action === 'compras') {
+      try {
+        let r = await fetchExternal('https://drive.usercontent.google.com/download?id=' + COMPRAS_CSV_ID + '&export=download');
+        if (!r.data || r.data.indexOf('fecha') === -1) {
+          // fallback al endpoint clasico
+          r = await fetchExternal('https://drive.google.com/uc?export=download&id=' + COMPRAS_CSV_ID);
+        }
+        return {
+          statusCode: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'public, max-age=1800' },
+          body: r.data,
+        };
+      } catch (e) {
+        return { statusCode: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'No se pudo bajar compras: ' + e.message }) };
+      }
+    }
 
     // Auth para sitio1 (farms, servicios, partos, destetes, etc.)
     const gatewayToken = await getWso2Token();
