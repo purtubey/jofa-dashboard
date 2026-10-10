@@ -1,0 +1,9 @@
+{
+  "name": "jofa-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JOFA Porcinos - panel de gestion. Funciones Netlify (proxy Agriness + compras + mapeo de categorias compartido via Netlify Blobs).",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.0"
+  }
+}

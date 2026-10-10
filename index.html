@@ -884,6 +884,22 @@ body {
     </div>
     <div class="section">
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <span>Costo de Produccion</span>
+        <select id="compras-costo-base" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+          <option value="all" selected>Todas las compras (neto)</option>
+        </select>
+      </div>
+      <div style="font-size:12px;color:var(--text-2);margin:-4px 0 12px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;">Cruza el costo (neto) contra los kg vendidos y cabezas de terminacion (Agriness). Elegí una categoria (ej. Alimento) para ver el costo de ese insumo por kg producido. "Todas" incluye compras de toda la empresa.</div>
+      <div class="kpi-grid" id="kpi-costoprod">
+        <div class="kpi-card" id="cp-porkg"><div class="kpi-label">$/kg producido</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Costo por kg producido</div><div class="tt-desc">Costo (neto) de la base elegida dividido por los kg vendidos de terminacion en el periodo.</div><div class="tt-calc">Calculo: Compras base ÷ Kg vendidos.</div></div></div>
+        <div class="kpi-card" id="cp-porcab"><div class="kpi-label">$/cabeza</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Costo por cabeza</div><div class="tt-desc">Costo (neto) de la base elegida dividido por las cabezas vendidas de terminacion.</div><div class="tt-calc">Calculo: Compras base ÷ Cabezas vendidas.</div></div></div>
+        <div class="kpi-card" id="cp-costomes"><div class="kpi-label">Costo Base (prom/mes)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Costo Base Promedio Mensual</div><div class="tt-desc">Promedio mensual del costo de la base elegida en el periodo mostrado.</div><div class="tt-calc">Calculo: Suma costo base ÷ meses.</div></div></div>
+        <div class="kpi-card" id="cp-kgmes"><div class="kpi-label">Kg Vendidos (prom/mes)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Kg Vendidos Promedio Mensual</div><div class="tt-desc">Promedio mensual de kg de terminacion vendidos.</div><div class="tt-calc">Calculo: Suma kg ÷ meses.</div></div></div>
+      </div>
+      <div class="table-wrap" id="compras-costoprod" style="margin-top:14px;"><div class="loading-overlay"><div class="spinner"></div> Cargando...</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>Clasificacion de Proveedores</span>
         <span id="compras-sinclasif" style="font-size:12px;color:var(--text-2);"></span>
       </div>
@@ -893,6 +909,7 @@ body {
         <button class="btn" id="btn-export-cat" style="background:var(--bg-3);color:var(--text-1);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;">Exportar mapeo</button>
         <button class="btn" id="btn-import-cat" style="background:var(--bg-3);color:var(--text-1);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;">Importar</button>
         <input id="compras-import-file" type="file" accept=".json" style="display:none;">
+        <span id="compras-save-status" style="font-size:11px;color:var(--text-3);min-width:70px;"></span>
       </div>
       <div class="table-wrap" id="compras-proveedores"><div class="loading-overlay"><div class="spinner"></div> Cargando proveedores...</div></div>
     </div>
@@ -2376,6 +2393,36 @@ out.push({ month: period, value: k.value });
   function catMapLoad() { try { const v = JSON.parse(localStorage.getItem(CAT_LS_MAP)); if (v && typeof v === 'object') return v; } catch (e) {} return {}; }
   function catMapSave(m) { try { localStorage.setItem(CAT_LS_MAP, JSON.stringify(m)); } catch (e) {} }
 
+  // Persistencia COMPARTIDA (servidor, Netlify Blobs) + cache local + indicador de estado
+  let catSaveTimer = null;
+  function comprasSaveStatus(s) {
+    const el = document.getElementById('compras-save-status'); if (!el) return;
+    if (s === 'saving') { el.textContent = 'Guardando...'; el.style.color = 'var(--text-3)'; }
+    else if (s === 'ok') { el.textContent = 'Guardado ' + String.fromCharCode(10003); el.style.color = 'var(--green)'; }
+    else if (s === 'err') { el.textContent = 'Error al guardar'; el.style.color = 'var(--red)'; }
+    else el.textContent = '';
+  }
+  function catPersist() {
+    catMapSave(comprasState.catMap); catListSave(comprasState.catList);
+    comprasSaveStatus('saving');
+    if (catSaveTimer) clearTimeout(catSaveTimer);
+    catSaveTimer = setTimeout(function () {
+      fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cat_set', params: { categorias: comprasState.catList, mapeo: comprasState.catMap } }) })
+        .then(function (r) { comprasSaveStatus(r.ok ? 'ok' : 'err'); })
+        .catch(function () { comprasSaveStatus('err'); });
+    }, 600);
+  }
+  async function catServerLoad() {
+    try {
+      const r = await fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cat_get' }) });
+      if (!r.ok) return false;
+      const d = await r.json();
+      if (d && Array.isArray(d.categorias) && d.categorias.length) comprasState.catList = d.categorias;
+      if (d && d.mapeo && typeof d.mapeo === 'object') comprasState.catMap = d.mapeo;
+      return true;
+    } catch (e) { return false; }
+  }
+
   function provKey(r) { return (r.cuit && r.cuit.trim()) ? r.cuit.trim() : (r.proveedor || '').trim().toLowerCase(); }
   function catOf(r) { return comprasState.catMap[provKey(r)] || 'Sin clasificar'; }
   function cNum(x) { x = (x == null ? '' : String(x)).trim().replace(/\\/g, ''); if (!x || x === '-') return 0; const n = parseFloat(x); return isNaN(n) ? 0 : n; }
@@ -2394,7 +2441,7 @@ out.push({ month: period, value: k.value });
     const idx = (name) => hdr.indexOf(name);
     const iF = idx('fecha'), iT = idx('tipo'), iProv = idx('proveedor'), iCuit = idx('cuit_proveedor'),
       iNg = idx('neto_gravado'), iNng = idx('neto_no_gravado'), iEx = idx('op_exentas'), iIva = idx('iva'),
-      iTot = idx('total'), iMes = idx('mes');
+      iTot = idx('total'), iMes = idx('mes'), iNum = idx('numero'), iPv = idx('punto_venta');
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
       const f = parseCsvLine(lines[i]); if (f.length < 3) continue;
@@ -2403,6 +2450,8 @@ out.push({ month: period, value: k.value });
         fecha: (f[iF] || '').trim(),
         mes: (iMes > -1 ? (f[iMes] || '').trim() : (f[iF] || '').slice(0, 7)),
         tipo: (f[iT] || '').trim(),
+        numero: iNum > -1 ? (f[iNum] || '').trim() : '',
+        pv: iPv > -1 ? (f[iPv] || '').trim() : '',
         proveedor: (f[iProv] || '').replace(/\\/g, '').trim(),
         cuit: iCuit > -1 ? (f[iCuit] || '').trim() : '',
         neto: neto, iva: cNum(f[iIva]), total: cNum(f[iTot])
@@ -2442,6 +2491,26 @@ out.push({ month: period, value: k.value });
         return;
       }
     }
+    // Mapeo de categorias COMPARTIDO (servidor). Primera vez sobreescribe el cache local.
+    if (!comprasState.catServerLoaded) { await catServerLoad(); comprasState.catServerLoaded = true; }
+    // Produccion mensual (Agriness) para el cruce de costo por kg / cabeza
+    if (!comprasState.prodLoaded) {
+      try {
+        const data = await fetchEvents('salidas_lotes', monthStart(-12), today());
+        const rows2 = Array.isArray(data) ? data : (data && (data.data || data.results)) || [];
+        const prod = {};
+        rows2.forEach(x => {
+          if (x.stage !== 'finishing') return;
+          if (!VENTA_SALE_TYPES.includes(x.event_type)) return;
+          if (esVentaInterna(x)) return;
+          const m = String(x.event_date || '').slice(0, 7); if (!m) return;
+          if (!prod[m]) prod[m] = { kg: 0, cab: 0 };
+          prod[m].kg += +x.total_weight || 0; prod[m].cab += +x.quantity || 0;
+        });
+        comprasState.prod = prod;
+      } catch (e) { comprasState.prod = {}; }
+      comprasState.prodLoaded = true;
+    }
     renderCompras();
   }
 
@@ -2467,6 +2536,50 @@ out.push({ month: period, value: k.value });
 
     renderComprasCategorias(sub, total);
     renderComprasProveedores(sub);
+    syncCostoBaseOptions();
+    renderCostoProduccion();
+  }
+
+  function comprasCostoBase() { const s = document.getElementById('compras-costo-base'); return s ? s.value : 'all'; }
+  function syncCostoBaseOptions() {
+    const s = document.getElementById('compras-costo-base'); if (!s) return;
+    const cur = s.value || 'all';
+    const opts = ['<option value="all">Todas las compras (neto)</option>'].concat((comprasState.catList || []).map(c => '<option value="' + c.replace(/"/g, '&quot;') + '">' + c + '</option>'));
+    s.innerHTML = opts.join('');
+    s.value = cur;
+    if (!s.value) s.value = 'all';
+  }
+  function renderCostoProduccion() {
+    const base = comprasCostoBase();
+    const prod = comprasState.prod || {};
+    const rows = comprasState.rows || [];
+    const costoMes = {};
+    rows.forEach(r => { if (base === 'all' || catOf(r) === base) costoMes[r.mes] = (costoMes[r.mes] || 0) + r.neto; });
+    const meses = Object.keys(prod).sort().slice(-12);
+    let totCosto = 0, totKg = 0, totCab = 0; const trows = [];
+    meses.forEach(m => {
+      const c = costoMes[m] || 0, kg = (prod[m] && prod[m].kg) || 0, cab = (prod[m] && prod[m].cab) || 0;
+      totCosto += c; totKg += kg; totCab += cab;
+      trows.push({ m: m, c: c, kg: kg, cab: cab, pkg: kg ? c / kg : null, pcab: cab ? c / cab : null });
+    });
+    const nMes = meses.length || 1;
+    setKpi('cp-porkg', totKg ? fmtMoney(totCosto / totKg) + '/kg' : '--', null, null, false);
+    setKpi('cp-porcab', totCab ? fmtMoney(totCosto / totCab) : '--', null, null, false);
+    setKpi('cp-costomes', fmtMoneyShort(totCosto / nMes), null, null, false);
+    setKpi('cp-kgmes', fmtInt(totKg / nMes) + ' kg', null, null, false);
+    const cont = document.getElementById('compras-costoprod');
+    if (!trows.length) { cont.innerHTML = '<div class="table-empty">Sin datos de produccion (Agriness) en el periodo</div>'; return; }
+    let h = '<table><thead><tr><th>Mes</th><th style="text-align:right;">Costo base (neto)</th><th style="text-align:right;">Kg vendidos</th><th style="text-align:right;">Cabezas</th><th style="text-align:right;">$/kg</th><th style="text-align:right;">$/cabeza</th></tr></thead><tbody>';
+    trows.slice().reverse().forEach(x => {
+      h += '<tr><td>' + monthLabel(x.m + '-01') + '</td>'
+        + '<td style="text-align:right;">' + fmtMoneyShort(x.c) + '</td>'
+        + '<td style="text-align:right;">' + fmtInt(x.kg) + '</td>'
+        + '<td style="text-align:right;">' + fmtInt(x.cab) + '</td>'
+        + '<td style="text-align:right;font-weight:600;">' + (x.pkg != null ? fmtMoney(x.pkg) : '--') + '</td>'
+        + '<td style="text-align:right;">' + (x.pcab != null ? fmtMoney(x.pcab) : '--') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    cont.innerHTML = h;
   }
 
   function renderComprasCategorias(sub, total) {
@@ -2512,8 +2625,8 @@ out.push({ month: period, value: k.value });
       let sel = '<select data-key="' + encodeURIComponent(p.key) + '" class="compras-cat-sel" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">';
       opts.forEach(o => { sel += '<option value="' + o.replace(/"/g, '&quot;') + '"' + (o === cur ? ' selected' : '') + '>' + o + '</option>'; });
       sel += '</select>';
-      h += '<tr>'
-        + '<td>' + p.nombre + '</td>'
+      h += '<tr class="compras-prov-row" data-provkey="' + encodeURIComponent(p.key) + '" style="cursor:pointer;">'
+        + '<td><span class="cpr-chev" style="color:var(--text-3);font-size:9px;margin-right:7px;">' + String.fromCharCode(9654) + '</span>' + p.nombre + '</td>'
         + '<td style="text-align:right;">' + fmtInt(p.n) + '</td>'
         + '<td style="text-align:right;">' + fmtMoneyShort(p.neto) + '</td>'
         + '<td style="text-align:right;font-weight:600;">' + fmtMoneyShort(p.total) + '</td>'
@@ -2522,6 +2635,33 @@ out.push({ month: period, value: k.value });
     });
     h += '</tbody></table>';
     cont.innerHTML = h;
+  }
+
+  // Detalle de facturas de un proveedor (en el periodo seleccionado)
+  function comprasFacturasHtml(key) {
+    const fac = comprasSubset().filter(r => provKey(r) === key).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    if (!fac.length) return '<div class="table-empty">Sin facturas en el periodo</div>';
+    let tN = 0, tI = 0, tT = 0;
+    let h = '<div style="padding:6px 12px 14px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="color:var(--text-3);text-align:left;border-bottom:1px solid var(--bg-3);">'
+      + '<th style="padding:6px 8px;">Fecha</th><th style="padding:6px 8px;">Comprobante</th><th style="padding:6px 8px;text-align:right;">Neto</th><th style="padding:6px 8px;text-align:right;">IVA</th><th style="padding:6px 8px;text-align:right;">Total</th></tr></thead><tbody>';
+    fac.forEach(r => {
+      tN += r.neto; tI += r.iva; tT += r.total;
+      const comp = (r.tipo || '') + (r.numero ? ' ' + (r.pv ? String(r.pv).padStart(4, '0') + '-' : '') + r.numero : '');
+      const esNC = /credito/i.test(r.tipo);
+      h += '<tr style="border-bottom:1px solid var(--bg-2);">'
+        + '<td style="padding:6px 8px;">' + fmtDate(r.fecha) + '</td>'
+        + '<td style="padding:6px 8px;color:' + (esNC ? 'var(--red)' : 'var(--text-2)') + ';">' + comp + '</td>'
+        + '<td style="padding:6px 8px;text-align:right;">' + fmtMoney(r.neto) + '</td>'
+        + '<td style="padding:6px 8px;text-align:right;color:var(--text-3);">' + fmtMoney(r.iva) + '</td>'
+        + '<td style="padding:6px 8px;text-align:right;font-weight:600;color:' + (r.total < 0 ? 'var(--red)' : 'var(--text-0)') + ';">' + fmtMoney(r.total) + '</td>'
+        + '</tr>';
+    });
+    h += '</tbody><tfoot><tr style="border-top:2px solid var(--bg-3);font-weight:700;">'
+      + '<td style="padding:6px 8px;" colspan="2">' + fac.length + ' comprobante(s)</td>'
+      + '<td style="padding:6px 8px;text-align:right;">' + fmtMoney(tN) + '</td>'
+      + '<td style="padding:6px 8px;text-align:right;">' + fmtMoney(tI) + '</td>'
+      + '<td style="padding:6px 8px;text-align:right;">' + fmtMoney(tT) + '</td></tr></tfoot></table></div>';
+    return h;
   }
 
   // Eventos de Compras (una sola vez, los elementos existen en el HTML estatico)
@@ -2541,6 +2681,8 @@ out.push({ month: period, value: k.value });
       if (opts.length) sel.insertAdjacentHTML('beforeend', '<option disabled>──── Mes puntual ────</option>' + opts.join(''));
     }
     if (sel) sel.addEventListener('change', function () { if (comprasState.loaded) renderCompras(); });
+    const baseSel = document.getElementById('compras-costo-base');
+    if (baseSel) baseSel.addEventListener('change', function () { if (comprasState.loaded) renderCostoProduccion(); });
     const buscar = document.getElementById('compras-buscar');
     if (buscar) buscar.addEventListener('input', function () { if (comprasState.rows) renderComprasProveedores(comprasSubset()); });
     const prov = document.getElementById('compras-proveedores');
@@ -2549,16 +2691,29 @@ out.push({ month: period, value: k.value });
       const key = decodeURIComponent(s.getAttribute('data-key'));
       const val = s.value;
       if (val === 'Sin clasificar') delete comprasState.catMap[key]; else comprasState.catMap[key] = val;
-      catMapSave(comprasState.catMap);
+      catPersist();
       const sub = comprasSubset();
       renderComprasCategorias(sub, sub.reduce((a, r) => a + r.total, 0));
       renderComprasProveedores(sub);
+    });
+    if (prov) prov.addEventListener('click', function (e) {
+      if (e.target.closest('select')) return;
+      const tr = e.target.closest('tr.compras-prov-row'); if (!tr) return;
+      const chev = tr.querySelector('.cpr-chev');
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains('compras-detalle')) { next.remove(); if (chev) chev.textContent = String.fromCharCode(9654); return; }
+      prov.querySelectorAll('tr.compras-detalle').forEach(d => d.remove());
+      prov.querySelectorAll('.cpr-chev').forEach(c => c.textContent = String.fromCharCode(9654));
+      const key = decodeURIComponent(tr.getAttribute('data-provkey'));
+      const dr = document.createElement('tr'); dr.className = 'compras-detalle';
+      dr.innerHTML = '<td colspan="5" style="padding:0;background:var(--bg-1);">' + comprasFacturasHtml(key) + '</td>';
+      tr.after(dr); if (chev) chev.textContent = String.fromCharCode(9660);
     });
     const btnNew = document.getElementById('btn-nueva-cat');
     if (btnNew) btnNew.addEventListener('click', function () {
       const name = (prompt('Nombre de la nueva categoria:') || '').trim();
       if (!name) return;
-      if (comprasState.catList.indexOf(name) === -1) { comprasState.catList.push(name); catListSave(comprasState.catList); }
+      if (comprasState.catList.indexOf(name) === -1) { comprasState.catList.push(name); catPersist(); }
       if (comprasState.loaded) renderCompras();
     });
     const btnExp = document.getElementById('btn-export-cat');
@@ -2577,8 +2732,9 @@ out.push({ month: period, value: k.value });
         rd.onload = function () {
           try {
             const d = JSON.parse(rd.result);
-            if (Array.isArray(d.categorias)) { comprasState.catList = d.categorias; catListSave(comprasState.catList); }
-            if (d.mapeo && typeof d.mapeo === 'object') { comprasState.catMap = d.mapeo; catMapSave(comprasState.catMap); }
+            if (Array.isArray(d.categorias)) comprasState.catList = d.categorias;
+            if (d.mapeo && typeof d.mapeo === 'object') comprasState.catMap = d.mapeo;
+            catPersist();
             if (comprasState.loaded) renderCompras();
             alert('Mapeo importado.');
           } catch (err) { alert('Archivo invalido: ' + err.message); }
