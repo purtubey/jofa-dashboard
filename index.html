@@ -861,10 +861,7 @@ body {
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>Compras / Costos</span>
         <select id="compras-period" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
-          <option value="12m" selected>Ultimos 12 meses</option>
-          <option value="thismonth">Mes actual</option>
-          <option value="3m">Ultimos 3 meses</option>
-          <option value="year">Anio actual</option>
+          <option value="year" selected>Anio actual</option>
           <option value="all">Todo (desde 2024)</option>
         </select>
       </div>
@@ -2414,14 +2411,21 @@ out.push({ month: period, value: k.value });
     return rows;
   }
 
-  function comprasPeriodStart() {
-    const sel = document.getElementById('compras-period');
-    const p = sel ? sel.value : '12m';
-    if (p === 'all') return '0000-00';
-    if (p === 'thismonth') return monthStart(0).slice(0, 7);
-    if (p === '3m') return monthStart(-2).slice(0, 7);
-    if (p === 'year') return new Date().getFullYear() + '-01';
-    return monthStart(-11).slice(0, 7);
+  function comprasSel() { const sel = document.getElementById('compras-period'); return sel ? sel.value : 'year'; }
+  function comprasMatch(mes) {
+    const v = comprasSel();
+    if (v === 'all') return true;
+    if (v === 'year') return mes >= (new Date().getFullYear() + '-01');
+    if (v.indexOf('m:') === 0) return mes === v.slice(2);
+    return true;
+  }
+  function comprasSubset() { return (comprasState.rows || []).filter(r => comprasMatch(r.mes)); }
+  function comprasPeriodLabel() {
+    const v = comprasSel();
+    if (v === 'all') return 'Todo (desde 2024)';
+    if (v === 'year') return 'Anio ' + new Date().getFullYear();
+    if (v.indexOf('m:') === 0) return monthLabel(v.slice(2) + '-01');
+    return '';
   }
 
   async function loadCompras() {
@@ -2443,8 +2447,7 @@ out.push({ month: period, value: k.value });
 
   function renderCompras() {
     const rows = comprasState.rows || [];
-    const startMes = comprasPeriodStart();
-    const sub = rows.filter(r => r.mes >= startMes);
+    const sub = comprasSubset();
     // KPIs
     let total = 0, neto = 0, iva = 0; const meses = {};
     sub.forEach(r => { total += r.total; neto += r.neto; iva += r.iva; if (r.mes) meses[r.mes] = 1; });
@@ -2455,11 +2458,11 @@ out.push({ month: period, value: k.value });
     setKpi('c-comprob', fmtInt(sub.length), null, null, false);
     setKpi('c-prommes', fmtMoneyShort(total / nMeses), null, null, false);
 
-    // Evolucion mensual (total con IVA)
+    // Evolucion: siempre los ultimos 18 meses de TODO (contexto, no depende del filtro)
     const byMes = {};
-    sub.forEach(r => { byMes[r.mes] = (byMes[r.mes] || 0) + r.total; });
+    rows.forEach(r => { byMes[r.mes] = (byMes[r.mes] || 0) + r.total; });
     const pts = Object.keys(byMes).sort().slice(-18).map(m => ({ month: m + '-01', label: monthLabel(m + '-01'), value: byMes[m] }));
-    if (pts.length === 0) document.getElementById('compras-evol').innerHTML = '<div class="table-empty">Sin compras en el periodo</div>';
+    if (pts.length === 0) document.getElementById('compras-evol').innerHTML = '<div class="table-empty">Sin compras</div>';
     else renderVentasBars('compras-evol', pts, '#f0c040');
 
     renderComprasCategorias(sub, total);
@@ -2526,9 +2529,20 @@ out.push({ month: period, value: k.value });
     comprasState.catList = catListLoad();
     comprasState.catMap = catMapLoad();
     const sel = document.getElementById('compras-period');
+    // Poblar meses puntuales (desde el mes actual hasta ene-2024)
+    if (sel) {
+      const mN = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      const now = new Date(); let y = now.getFullYear(), m = now.getMonth() + 1; const opts = [];
+      while (y > 2024 || (y === 2024 && m >= 1)) {
+        const ym = y + '-' + String(m).padStart(2, '0');
+        opts.push('<option value="m:' + ym + '">' + mN[m - 1] + ' ' + y + '</option>');
+        m--; if (m < 1) { m = 12; y--; }
+      }
+      if (opts.length) sel.insertAdjacentHTML('beforeend', '<option disabled>──── Mes puntual ────</option>' + opts.join(''));
+    }
     if (sel) sel.addEventListener('change', function () { if (comprasState.loaded) renderCompras(); });
     const buscar = document.getElementById('compras-buscar');
-    if (buscar) buscar.addEventListener('input', function () { if (comprasState.rows) renderComprasProveedores(comprasState.rows.filter(r => r.mes >= comprasPeriodStart())); });
+    if (buscar) buscar.addEventListener('input', function () { if (comprasState.rows) renderComprasProveedores(comprasSubset()); });
     const prov = document.getElementById('compras-proveedores');
     if (prov) prov.addEventListener('change', function (e) {
       const s = e.target; if (!s.classList || !s.classList.contains('compras-cat-sel')) return;
@@ -2536,7 +2550,7 @@ out.push({ month: period, value: k.value });
       const val = s.value;
       if (val === 'Sin clasificar') delete comprasState.catMap[key]; else comprasState.catMap[key] = val;
       catMapSave(comprasState.catMap);
-      const sub = (comprasState.rows || []).filter(r => r.mes >= comprasPeriodStart());
+      const sub = comprasSubset();
       renderComprasCategorias(sub, sub.reduce((a, r) => a + r.total, 0));
       renderComprasProveedores(sub);
     });
