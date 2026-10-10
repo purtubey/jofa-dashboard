@@ -489,6 +489,7 @@ body {
   <button class="tab-btn" data-tab="mortalidad">Mortalidad</button>
   <button class="tab-btn" data-tab="engorde">Engorde</button>
   <button class="tab-btn" data-tab="ventas">Ventas</button>
+  <button class="tab-btn" data-tab="compras">Compras</button>
   <button class="tab-btn" data-tab="indicadores">Indicadores</button>
   <button class="tab-btn" data-tab="config">Config</button>
 </nav>
@@ -851,6 +852,52 @@ body {
     <div class="section">
       <div class="section-title">Detalle de Ventas</div>
       <div class="table-wrap" id="table-ventas"><div class="loading-overlay"><div class="spinner"></div> Cargando ventas...</div></div>
+    </div>
+  </div>
+
+  <!-- COMPRAS -->
+  <div class="page" id="page-compras">
+    <div class="section">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <span>Compras / Costos</span>
+        <select id="compras-period" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+          <option value="12m" selected>Ultimos 12 meses</option>
+          <option value="thismonth">Mes actual</option>
+          <option value="3m">Ultimos 3 meses</option>
+          <option value="year">Anio actual</option>
+          <option value="all">Todo (desde 2024)</option>
+        </select>
+      </div>
+      <div id="compras-nota" style="font-size:12px;color:var(--text-2);margin:-4px 0 14px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;">Facturas de compra bajadas de ARCA/AFIP (Smart ARCA &middot; Pymetech), actualizadas a diario. Montos en pesos. Notas de credito ya restadas.</div>
+      <div class="kpi-grid" id="kpi-compras">
+        <div class="kpi-card" id="c-total"><div class="kpi-label">Total Compras</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total de Compras (con IVA)</div><div class="tt-desc">Importe total facturado por proveedores en el periodo, IVA incluido. Notas de credito restadas.</div><div class="tt-calc">Calculo: Suma de total de comprobantes.</div></div></div>
+        <div class="kpi-card" id="c-neto"><div class="kpi-label">Neto (sin IVA)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Neto sin IVA</div><div class="tt-desc">Costo real del insumo; el IVA es credito fiscal recuperable.</div><div class="tt-calc">Calculo: Suma de neto gravado + no gravado + exento.</div></div></div>
+        <div class="kpi-card" id="c-iva"><div class="kpi-label">IVA</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">IVA (credito fiscal)</div><div class="tt-desc">IVA total de las compras del periodo.</div><div class="tt-calc">Calculo: Suma de IVA de comprobantes.</div></div></div>
+        <div class="kpi-card" id="c-comprob"><div class="kpi-label">Comprobantes</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Comprobantes</div><div class="tt-desc">Cantidad de facturas/notas en el periodo.</div><div class="tt-calc">Calculo: Conteo de comprobantes.</div></div></div>
+        <div class="kpi-card" id="c-prommes"><div class="kpi-label">Promedio Mensual</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Compra Promedio Mensual</div><div class="tt-desc">Total dividido por la cantidad de meses del periodo.</div><div class="tt-calc">Calculo: Total ÷ meses.</div></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Evolucion Mensual de Compras</div>
+      <div id="compras-evol"><div class="loading-overlay"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Por Categoria</div>
+      <div class="table-wrap" id="compras-categorias"><div class="loading-overlay"><div class="spinner"></div> Cargando...</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <span>Clasificacion de Proveedores</span>
+        <span id="compras-sinclasif" style="font-size:12px;color:var(--text-2);"></span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+        <input id="compras-buscar" type="text" placeholder="Buscar proveedor..." style="flex:1;min-width:180px;background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;">
+        <button class="btn" id="btn-nueva-cat" style="background:var(--blue);color:#fff;border:0;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;">+ Categoria</button>
+        <button class="btn" id="btn-export-cat" style="background:var(--bg-3);color:var(--text-1);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;">Exportar mapeo</button>
+        <button class="btn" id="btn-import-cat" style="background:var(--bg-3);color:var(--text-1);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;">Importar</button>
+        <input id="compras-import-file" type="file" accept=".json" style="display:none;">
+      </div>
+      <div class="table-wrap" id="compras-proveedores"><div class="loading-overlay"><div class="spinner"></div> Cargando proveedores...</div></div>
     </div>
   </div>
 
@@ -1409,6 +1456,7 @@ out.push({ month: period, value: k.value });
       case 'mortalidad': await loadMortalidad(); break;
       case 'engorde': await loadEngorde(); break;
       case 'ventas': await loadVentas(); break;
+      case 'compras': await loadCompras(); break;
       case 'indicadores': await loadIndicadores(); break;
     }
   }
@@ -2291,7 +2339,8 @@ out.push({ month: period, value: k.value });
   }
 
   // Grafico de barras para evolucion mensual de ingresos por ventas (positivo, verde)
-  function renderVentasBars(containerId, pts) {
+  function renderVentasBars(containerId, pts, barColor) {
+    barColor = barColor || '#2ecc8b';
     const c = document.getElementById(containerId);
     if (!c) return;
     const valid = (pts || []).filter(p => p.value != null && !isNaN(p.value));
@@ -2311,12 +2360,219 @@ out.push({ month: period, value: k.value });
       const bh = v / maxV * ph;
       const y = y0 - bh;
       const isLast = i === n - 1;
-      svg += '<rect x="' + (cx - barW / 2) + '" y="' + y + '" width="' + barW + '" height="' + Math.max(1, bh) + '" rx="3" fill="#2ecc8b" opacity="' + (isLast ? '1' : '0.82') + '"><title>' + p.label + ': ' + fmtMoney(v) + '</title></rect>';
+      svg += '<rect x="' + (cx - barW / 2) + '" y="' + y + '" width="' + barW + '" height="' + Math.max(1, bh) + '" rx="3" fill="' + barColor + '" opacity="' + (isLast ? '1' : '0.82') + '"><title>' + p.label + ': ' + fmtMoney(v) + '</title></rect>';
       svg += '<text x="' + cx + '" y="' + (y - 5) + '" text-anchor="middle" fill="var(--text-1)" font-size="9">' + fmtMoneyShort(v) + '</text>';
       svg += '<text x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle" fill="var(--text-3)" font-size="9">' + p.label + '</text>';
     });
     c.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;">' + svg + '</svg>';
   }
+
+  // ===================== COMPRAS / COSTOS =====================
+  const comprasState = { rows: null, loaded: false, catList: null, catMap: null };
+  const CAT_LS_LIST = 'jofa_compras_cats_v1';
+  const CAT_LS_MAP = 'jofa_compras_map_v1';
+  const CAT_DEFAULT = ['Alimento/Nutricion','Genetica','Sanidad/Veterinaria','Energia/Combustible','Electricidad/Mantenimiento','Agro/Semillas','Servicios/Fletes','Construccion','Otros'];
+  const CAT_COLORS = ['#4f7df5','#2ecc8b','#e85d5d','#f0c040','#a78bfa','#f97316','#22d3ee','#94a3b8','#64748b'];
+
+  function catListLoad() { try { const v = JSON.parse(localStorage.getItem(CAT_LS_LIST)); if (Array.isArray(v) && v.length) return v; } catch (e) {} return CAT_DEFAULT.slice(); }
+  function catListSave(l) { try { localStorage.setItem(CAT_LS_LIST, JSON.stringify(l)); } catch (e) {} }
+  function catMapLoad() { try { const v = JSON.parse(localStorage.getItem(CAT_LS_MAP)); if (v && typeof v === 'object') return v; } catch (e) {} return {}; }
+  function catMapSave(m) { try { localStorage.setItem(CAT_LS_MAP, JSON.stringify(m)); } catch (e) {} }
+
+  function provKey(r) { return (r.cuit && r.cuit.trim()) ? r.cuit.trim() : (r.proveedor || '').trim().toLowerCase(); }
+  function catOf(r) { return comprasState.catMap[provKey(r)] || 'Sin clasificar'; }
+  function cNum(x) { x = (x == null ? '' : String(x)).trim().replace(/\\/g, ''); if (!x || x === '-') return 0; const n = parseFloat(x); return isNaN(n) ? 0 : n; }
+
+  function parseCsvLine(line) {
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < line.length; i++) { const ch = line[i];
+      if (q) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+      else { if (ch === '"') q = true; else if (ch === ',') { out.push(cur); cur = ''; } else cur += ch; } }
+    out.push(cur); return out;
+  }
+  function parseCompras(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    if (lines.length < 2) return [];
+    const hdr = parseCsvLine(lines[0]).map(h => h.replace(/\\/g, '').trim().toLowerCase());
+    const idx = (name) => hdr.indexOf(name);
+    const iF = idx('fecha'), iT = idx('tipo'), iProv = idx('proveedor'), iCuit = idx('cuit_proveedor'),
+      iNg = idx('neto_gravado'), iNng = idx('neto_no_gravado'), iEx = idx('op_exentas'), iIva = idx('iva'),
+      iTot = idx('total'), iMes = idx('mes');
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const f = parseCsvLine(lines[i]); if (f.length < 3) continue;
+      const neto = cNum(f[iNg]) + cNum(f[iNng]) + cNum(f[iEx]);
+      rows.push({
+        fecha: (f[iF] || '').trim(),
+        mes: (iMes > -1 ? (f[iMes] || '').trim() : (f[iF] || '').slice(0, 7)),
+        tipo: (f[iT] || '').trim(),
+        proveedor: (f[iProv] || '').replace(/\\/g, '').trim(),
+        cuit: iCuit > -1 ? (f[iCuit] || '').trim() : '',
+        neto: neto, iva: cNum(f[iIva]), total: cNum(f[iTot])
+      });
+    }
+    return rows;
+  }
+
+  function comprasPeriodStart() {
+    const sel = document.getElementById('compras-period');
+    const p = sel ? sel.value : '12m';
+    if (p === 'all') return '0000-00';
+    if (p === 'thismonth') return monthStart(0).slice(0, 7);
+    if (p === '3m') return monthStart(-2).slice(0, 7);
+    if (p === 'year') return new Date().getFullYear() + '-01';
+    return monthStart(-11).slice(0, 7);
+  }
+
+  async function loadCompras() {
+    if (!comprasState.catList) { comprasState.catList = catListLoad(); comprasState.catMap = catMapLoad(); }
+    if (!comprasState.loaded) {
+      document.getElementById('compras-evol').innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Bajando facturas...</div>';
+      try {
+        const resp = await fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'compras' }) });
+        const text = await resp.text();
+        comprasState.rows = parseCompras(text);
+        comprasState.loaded = true;
+      } catch (e) {
+        document.getElementById('compras-evol').innerHTML = '<div class="table-empty">Error al bajar compras: ' + e.message + '</div>';
+        return;
+      }
+    }
+    renderCompras();
+  }
+
+  function renderCompras() {
+    const rows = comprasState.rows || [];
+    const startMes = comprasPeriodStart();
+    const sub = rows.filter(r => r.mes >= startMes);
+    // KPIs
+    let total = 0, neto = 0, iva = 0; const meses = {};
+    sub.forEach(r => { total += r.total; neto += r.neto; iva += r.iva; if (r.mes) meses[r.mes] = 1; });
+    const nMeses = Object.keys(meses).length || 1;
+    setKpi('c-total', fmtMoneyShort(total), null, null, false);
+    setKpi('c-neto', fmtMoneyShort(neto), null, null, false);
+    setKpi('c-iva', fmtMoneyShort(iva), null, null, false);
+    setKpi('c-comprob', fmtInt(sub.length), null, null, false);
+    setKpi('c-prommes', fmtMoneyShort(total / nMeses), null, null, false);
+
+    // Evolucion mensual (total con IVA)
+    const byMes = {};
+    sub.forEach(r => { byMes[r.mes] = (byMes[r.mes] || 0) + r.total; });
+    const pts = Object.keys(byMes).sort().slice(-18).map(m => ({ month: m + '-01', label: monthLabel(m + '-01'), value: byMes[m] }));
+    if (pts.length === 0) document.getElementById('compras-evol').innerHTML = '<div class="table-empty">Sin compras en el periodo</div>';
+    else renderVentasBars('compras-evol', pts, '#f0c040');
+
+    renderComprasCategorias(sub, total);
+    renderComprasProveedores(sub);
+  }
+
+  function renderComprasCategorias(sub, total) {
+    const byCat = {};
+    sub.forEach(r => { const c = catOf(r); if (!byCat[c]) byCat[c] = { total: 0, neto: 0, n: 0 }; byCat[c].total += r.total; byCat[c].neto += r.neto; byCat[c].n++; });
+    const list = Object.entries(byCat).map(([k, v]) => ({ cat: k, ...v })).sort((a, b) => b.total - a.total);
+    const cont = document.getElementById('compras-categorias');
+    if (list.length === 0) { cont.innerHTML = '<div class="table-empty">Sin datos</div>'; return; }
+    let h = '<table><thead><tr><th>Categoria</th><th style="text-align:right;">Comprob.</th><th style="text-align:right;">Neto</th><th style="text-align:right;">Total</th><th style="min-width:120px;">% del total</th></tr></thead><tbody>';
+    list.forEach(x => {
+      const pct = total ? (x.total / total * 100) : 0;
+      const sinCl = x.cat === 'Sin clasificar';
+      const color = sinCl ? 'var(--red)' : (CAT_COLORS[comprasState.catList.indexOf(x.cat) % CAT_COLORS.length] || 'var(--blue)');
+      h += '<tr>'
+        + '<td style="' + (sinCl ? 'color:var(--red);font-weight:600;' : '') + '">' + x.cat + '</td>'
+        + '<td style="text-align:right;">' + fmtInt(x.n) + '</td>'
+        + '<td style="text-align:right;">' + fmtMoneyShort(x.neto) + '</td>'
+        + '<td style="text-align:right;font-weight:600;">' + fmtMoneyShort(x.total) + '</td>'
+        + '<td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;background:var(--bg-3);border-radius:4px;height:8px;overflow:hidden;"><div style="width:' + pct.toFixed(0) + '%;background:' + color + ';height:100%;"></div></div><span style="font-size:11px;min-width:32px;text-align:right;color:var(--text-2);">' + pct.toFixed(0) + '%</span></div></td>'
+        + '</tr>';
+    });
+    h += '</tbody></table>';
+    cont.innerHTML = h;
+  }
+
+  function renderComprasProveedores(sub) {
+    const byProv = {};
+    sub.forEach(r => { const k = provKey(r); if (!byProv[k]) byProv[k] = { key: k, nombre: r.proveedor, total: 0, neto: 0, n: 0, r: r }; byProv[k].total += r.total; byProv[k].neto += r.neto; byProv[k].n++; if (r.proveedor && r.proveedor.length > byProv[k].nombre.length) byProv[k].nombre = r.proveedor; });
+    let list = Object.values(byProv).sort((a, b) => b.total - a.total);
+    const q = (document.getElementById('compras-buscar').value || '').toLowerCase().trim();
+    if (q) list = list.filter(p => p.nombre.toLowerCase().indexOf(q) > -1);
+    // Badge sin clasificar (sobre todo el periodo, no filtrado por busqueda)
+    let sinN = 0, sinT = 0;
+    Object.values(byProv).forEach(p => { if (!comprasState.catMap[p.key]) { sinN++; sinT += p.total; } });
+    const badge = document.getElementById('compras-sinclasif');
+    if (badge) badge.innerHTML = sinN > 0 ? '<span style="color:var(--red);font-weight:600;">' + sinN + ' sin clasificar</span> (' + fmtMoneyShort(sinT) + ')' : '<span style="color:var(--green);font-weight:600;">Todo clasificado</span>';
+    const opts = ['Sin clasificar'].concat(comprasState.catList);
+    const cont = document.getElementById('compras-proveedores');
+    if (list.length === 0) { cont.innerHTML = '<div class="table-empty">Sin proveedores</div>'; return; }
+    let h = '<table><thead><tr><th>Proveedor</th><th style="text-align:right;">Comprob.</th><th style="text-align:right;">Neto</th><th style="text-align:right;">Total</th><th>Categoria</th></tr></thead><tbody>';
+    list.slice(0, 300).forEach(p => {
+      const cur = comprasState.catMap[p.key] || 'Sin clasificar';
+      let sel = '<select data-key="' + encodeURIComponent(p.key) + '" class="compras-cat-sel" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">';
+      opts.forEach(o => { sel += '<option value="' + o.replace(/"/g, '&quot;') + '"' + (o === cur ? ' selected' : '') + '>' + o + '</option>'; });
+      sel += '</select>';
+      h += '<tr>'
+        + '<td>' + p.nombre + '</td>'
+        + '<td style="text-align:right;">' + fmtInt(p.n) + '</td>'
+        + '<td style="text-align:right;">' + fmtMoneyShort(p.neto) + '</td>'
+        + '<td style="text-align:right;font-weight:600;">' + fmtMoneyShort(p.total) + '</td>'
+        + '<td>' + sel + '</td>'
+        + '</tr>';
+    });
+    h += '</tbody></table>';
+    cont.innerHTML = h;
+  }
+
+  // Eventos de Compras (una sola vez, los elementos existen en el HTML estatico)
+  (function initCompras() {
+    comprasState.catList = catListLoad();
+    comprasState.catMap = catMapLoad();
+    const sel = document.getElementById('compras-period');
+    if (sel) sel.addEventListener('change', function () { if (comprasState.loaded) renderCompras(); });
+    const buscar = document.getElementById('compras-buscar');
+    if (buscar) buscar.addEventListener('input', function () { if (comprasState.rows) renderComprasProveedores(comprasState.rows.filter(r => r.mes >= comprasPeriodStart())); });
+    const prov = document.getElementById('compras-proveedores');
+    if (prov) prov.addEventListener('change', function (e) {
+      const s = e.target; if (!s.classList || !s.classList.contains('compras-cat-sel')) return;
+      const key = decodeURIComponent(s.getAttribute('data-key'));
+      const val = s.value;
+      if (val === 'Sin clasificar') delete comprasState.catMap[key]; else comprasState.catMap[key] = val;
+      catMapSave(comprasState.catMap);
+      const sub = (comprasState.rows || []).filter(r => r.mes >= comprasPeriodStart());
+      renderComprasCategorias(sub, sub.reduce((a, r) => a + r.total, 0));
+      renderComprasProveedores(sub);
+    });
+    const btnNew = document.getElementById('btn-nueva-cat');
+    if (btnNew) btnNew.addEventListener('click', function () {
+      const name = (prompt('Nombre de la nueva categoria:') || '').trim();
+      if (!name) return;
+      if (comprasState.catList.indexOf(name) === -1) { comprasState.catList.push(name); catListSave(comprasState.catList); }
+      if (comprasState.loaded) renderCompras();
+    });
+    const btnExp = document.getElementById('btn-export-cat');
+    if (btnExp) btnExp.addEventListener('click', function () {
+      const data = JSON.stringify({ categorias: comprasState.catList, mapeo: comprasState.catMap }, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'jofa-compras-categorias.json'; a.click();
+    });
+    const btnImp = document.getElementById('btn-import-cat');
+    const fileImp = document.getElementById('compras-import-file');
+    if (btnImp && fileImp) {
+      btnImp.addEventListener('click', function () { fileImp.click(); });
+      fileImp.addEventListener('change', function () {
+        const file = fileImp.files[0]; if (!file) return;
+        const rd = new FileReader();
+        rd.onload = function () {
+          try {
+            const d = JSON.parse(rd.result);
+            if (Array.isArray(d.categorias)) { comprasState.catList = d.categorias; catListSave(comprasState.catList); }
+            if (d.mapeo && typeof d.mapeo === 'object') { comprasState.catMap = d.mapeo; catMapSave(comprasState.catMap); }
+            if (comprasState.loaded) renderCompras();
+            alert('Mapeo importado.');
+          } catch (err) { alert('Archivo invalido: ' + err.message); }
+        };
+        rd.readAsText(file);
+      });
+    }
+  })();
 
   // ---- INDICADORES (TRENDS) ----
   async function loadIndicadores() {
