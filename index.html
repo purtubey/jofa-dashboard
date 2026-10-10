@@ -84,6 +84,17 @@ body {
 }
 .tab-btn:hover { color: var(--text-1); }
 .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-select {
+  background: none; border: none; color: var(--text-2);
+  font-family: inherit; font-size: 0.78rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px;
+  padding: 12px 20px; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all 0.2s;
+  -webkit-appearance: none; appearance: none; outline: none;
+}
+.tab-select:hover { color: var(--text-1); }
+.tab-select.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-select option { background: var(--bg-2); color: var(--text-0); text-transform: none; letter-spacing: normal; font-weight: 500; }
 
 /* MAIN */
 .main { padding: 28px 32px; }
@@ -477,21 +488,24 @@ body {
   <div class="header-status">
     <div class="status-dot" id="statusDot"></div>
     <span id="statusText">Verificando conexion...</span>
-    <a href="/__logout" title="Cerrar sesion" style="margin-left:14px;color:var(--text-3);font-size:12px;text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:7px;">Salir</a>
+    <button id="btnConfig" title="Configuracion" style="margin-left:14px;background:none;border:1px solid var(--border);color:var(--text-2);border-radius:7px;padding:4px 9px;font-size:15px;line-height:1;cursor:pointer;">&#9881;</button>
+    <a href="/__logout" title="Cerrar sesion" style="margin-left:8px;color:var(--text-3);font-size:12px;text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:7px;">Salir</a>
   </div>
 </header>
 
 <nav class="tabs" id="tabNav">
   <button class="tab-btn active" data-tab="resumen">Resumen</button>
-  <button class="tab-btn" data-tab="servicio">Servicio</button>
-  <button class="tab-btn" data-tab="maternidad">Maternidad</button>
-  <button class="tab-btn" data-tab="destete">Destete</button>
-  <button class="tab-btn" data-tab="mortalidad">Mortalidad</button>
-  <button class="tab-btn" data-tab="engorde">Engorde</button>
   <button class="tab-btn" data-tab="ventas">Ventas</button>
   <button class="tab-btn" data-tab="compras">Compras</button>
+  <select id="sitioSelect" class="tab-select" title="Sitios de produccion">
+    <option value="">Produccion ▾</option>
+    <option value="servicio">Servicio</option>
+    <option value="maternidad">Maternidad</option>
+    <option value="destete">Destete</option>
+    <option value="mortalidad">Mortalidad</option>
+    <option value="engorde">Engorde</option>
+  </select>
   <button class="tab-btn" data-tab="indicadores">Indicadores</button>
-  <button class="tab-btn" data-tab="config">Config</button>
 </nav>
 
 <main class="main">
@@ -814,8 +828,8 @@ body {
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>Ventas de Lotes</span>
         <select id="ventas-period" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
-          <option value="priceStart" selected>Desde carga de precios</option>
-          <option value="thismonth">Mes actual</option>
+          <option value="priceStart">Desde carga de precios</option>
+          <option value="thismonth" selected>Mes actual</option>
           <option value="3m">Ultimos 3 meses</option>
           <option value="12m">Ultimos 12 meses</option>
           <option value="year">Anio actual</option>
@@ -861,11 +875,13 @@ body {
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>Compras / Costos</span>
         <select id="compras-period" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
-          <option value="year" selected>Anio actual</option>
+          <option value="thismonth" selected>Mes actual</option>
+          <option value="year">Anio actual</option>
           <option value="all">Todo (desde 2024)</option>
         </select>
       </div>
-      <div id="compras-nota" style="font-size:12px;color:var(--text-2);margin:-4px 0 14px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;">Facturas de compra bajadas de ARCA/AFIP (Smart ARCA &middot; Pymetech), actualizadas a diario. Montos en pesos. Notas de credito ya restadas.</div>
+      <div id="compras-nota" style="font-size:12px;color:var(--text-2);margin:-4px 0 6px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;">Facturas de compra bajadas de ARCA/AFIP (Smart ARCA &middot; Pymetech), actualizadas a diario. Montos en pesos. Notas de credito ya restadas.</div>
+      <div id="compras-updated" style="font-size:11px;color:var(--text-3);margin:0 0 14px;padding:0 2px;"></div>
       <div class="kpi-grid" id="kpi-compras">
         <div class="kpi-card" id="c-total"><div class="kpi-label">Total Compras</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Total de Compras (con IVA)</div><div class="tt-desc">Importe total facturado por proveedores en el periodo, IVA incluido. Notas de credito restadas.</div><div class="tt-calc">Calculo: Suma de total de comprobantes.</div></div></div>
         <div class="kpi-card" id="c-neto"><div class="kpi-label">Neto (sin IVA)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Neto sin IVA</div><div class="tt-desc">Costo real del insumo; el IVA es credito fiscal recuperable.</div><div class="tt-calc">Calculo: Suma de neto gravado + no gravado + exento.</div></div></div>
@@ -1372,16 +1388,28 @@ out.push({ month: period, value: k.value });
   }
 
   // ---- TAB NAVIGATION ----
-  document.getElementById('tabNav').addEventListener('click', function(e) {
-    if (!e.target.classList.contains('tab-btn')) return;
-    const tab = e.target.dataset.tab;
+  const SITIOS_PROD = ['servicio', 'maternidad', 'destete', 'mortalidad', 'engorde'];
+  function activarTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
+    const sitioSel = document.getElementById('sitioSelect');
+    const btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+    if (btn) { btn.classList.add('active'); if (sitioSel) { sitioSel.classList.remove('active'); sitioSel.value = ''; } }
+    else if (SITIOS_PROD.indexOf(tab) > -1 && sitioSel) { sitioSel.classList.add('active'); sitioSel.value = tab; }
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('page-' + tab).classList.add('active');
+    const pg = document.getElementById('page-' + tab); if (pg) pg.classList.add('active');
     state.currentTab = tab;
     loadTabData(tab);
+  }
+  document.getElementById('tabNav').addEventListener('click', function (e) {
+    if (!e.target.classList.contains('tab-btn')) return;
+    activarTab(e.target.dataset.tab);
   });
+  (function () {
+    const sitioSel = document.getElementById('sitioSelect');
+    if (sitioSel) sitioSel.addEventListener('change', function () { if (this.value) activarTab(this.value); });
+    const btnCfg = document.getElementById('btnConfig');
+    if (btnCfg) btnCfg.addEventListener('click', function () { activarTab('config'); });
+  })();
 
   // Selector de periodo de Ventas: recarga al cambiar
   (function(){
@@ -2441,7 +2469,7 @@ out.push({ month: period, value: k.value });
     const idx = (name) => hdr.indexOf(name);
     const iF = idx('fecha'), iT = idx('tipo'), iProv = idx('proveedor'), iCuit = idx('cuit_proveedor'),
       iNg = idx('neto_gravado'), iNng = idx('neto_no_gravado'), iEx = idx('op_exentas'), iIva = idx('iva'),
-      iTot = idx('total'), iMes = idx('mes'), iNum = idx('numero'), iPv = idx('punto_venta');
+      iTot = idx('total'), iMes = idx('mes'), iNum = idx('numero'), iPv = idx('punto_venta'), iAct = idx('actualizado');
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
       const f = parseCsvLine(lines[i]); if (f.length < 3) continue;
@@ -2454,7 +2482,8 @@ out.push({ month: period, value: k.value });
         pv: iPv > -1 ? (f[iPv] || '').trim() : '',
         proveedor: (f[iProv] || '').replace(/\\/g, '').trim(),
         cuit: iCuit > -1 ? (f[iCuit] || '').trim() : '',
-        neto: neto, iva: cNum(f[iIva]), total: cNum(f[iTot])
+        neto: neto, iva: cNum(f[iIva]), total: cNum(f[iTot]),
+        actualizado: iAct > -1 ? (f[iAct] || '').trim() : ''
       });
     }
     return rows;
@@ -2464,6 +2493,7 @@ out.push({ month: period, value: k.value });
   function comprasMatch(mes) {
     const v = comprasSel();
     if (v === 'all') return true;
+    if (v === 'thismonth') return mes === curMonthStr();
     if (v === 'year') return mes >= (new Date().getFullYear() + '-01');
     if (v.indexOf('m:') === 0) return mes === v.slice(2);
     return true;
@@ -2472,6 +2502,7 @@ out.push({ month: period, value: k.value });
   function comprasPeriodLabel() {
     const v = comprasSel();
     if (v === 'all') return 'Todo (desde 2024)';
+    if (v === 'thismonth') return monthLabel(curMonthStr() + '-01');
     if (v === 'year') return 'Anio ' + new Date().getFullYear();
     if (v.indexOf('m:') === 0) return monthLabel(v.slice(2) + '-01');
     return '';
@@ -2516,6 +2547,19 @@ out.push({ month: period, value: k.value });
 
   function renderCompras() {
     const rows = comprasState.rows || [];
+    // Ultima actualizacion del archivo (max de la columna "actualizado")
+    const upd = rows.reduce(function (mx, r) { return (r.actualizado && r.actualizado > mx) ? r.actualizado : mx; }, '');
+    const updEl = document.getElementById('compras-updated');
+    if (updEl) {
+      if (upd) {
+        const d = upd.slice(0, 10), t = upd.slice(11, 16), hoy = today();
+        const esHoy = d === hoy;
+        const diaDif = Math.max(0, Math.round((new Date(hoy) - new Date(d)) / 86400000));
+        const color = esHoy ? 'var(--green)' : (diaDif <= 1 ? 'var(--yellow)' : 'var(--red)');
+        const extra = esHoy ? 'al dia' : (diaDif + ' dia(s) atras');
+        updEl.innerHTML = '<span style="color:' + color + ';">' + String.fromCharCode(9679) + '</span> Archivo actualizado: <strong>' + fmtDate(d) + (t ? (' ' + t + ' hs') : '') + '</strong> <span style="color:var(--text-3);">(' + extra + ')</span>';
+      } else updEl.innerHTML = '';
+    }
     const sub = comprasSubset();
     // KPIs
     let total = 0, neto = 0, iva = 0; const meses = {};
