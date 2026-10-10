@@ -81,6 +81,17 @@ function fetchExternal(url, redirects) {
   });
 }
 
+// Store de Netlify Blobs para el mapeo de categorias de compras (compartido).
+// Netlify no siempre auto-configura Blobs en funciones clasicas: si estan seteadas
+// NETLIFY_SITE_ID y NETLIFY_BLOBS_TOKEN las usamos; si no, intento auto.
+function getCatStore() {
+  const { getStore } = require('@netlify/blobs');
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN;
+  if (siteID && token) return getStore({ name: 'jofa-compras', consistency: 'strong', siteID: siteID, token: token });
+  return getStore({ name: 'jofa-compras', consistency: 'strong' });
+}
+
 async function getWso2Token() {
   if (wso2Token && Date.now() < wso2TokenExpiry) return wso2Token;
 
@@ -232,8 +243,7 @@ exports.handler = async (event) => {
     // Mapeo de categorias de compras COMPARTIDO (Netlify Blobs). No requiere auth de Agriness.
     if (action === 'cat_get') {
       try {
-        const { getStore } = require('@netlify/blobs');
-        const store = getStore({ name: 'jofa-compras', consistency: 'strong' });
+        const store = getCatStore();
         const data = await store.get('categorias', { type: 'json' });
         return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(data || { categorias: null, mapeo: {} }) };
       } catch (e) {
@@ -242,8 +252,7 @@ exports.handler = async (event) => {
     }
     if (action === 'cat_set') {
       try {
-        const { getStore } = require('@netlify/blobs');
-        const store = getStore({ name: 'jofa-compras', consistency: 'strong' });
+        const store = getCatStore();
         await store.setJSON('categorias', params || {});
         return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true }) };
       } catch (e) {
