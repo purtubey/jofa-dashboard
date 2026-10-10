@@ -687,6 +687,20 @@ body {
         </div>
       </div>
     </div>
+    <!-- Estado de Resultado -->
+    <div class="section">
+      <div class="section-title">Estado de Resultado (mes en curso)</div>
+      <div class="kpi-grid" id="kpi-resumen-resultado">
+        <div class="kpi-card kpi-expandable" id="kpi-estado-resultado"><div class="kpi-label">Resultado (Ventas &minus; Compras)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Estado de Resultado</div><div class="tt-desc">Ingresos por ventas (con precio cargado) menos costos de compras (neto) del mes. Click para ver la evolucion mensual.</div><div class="tt-calc">Calculo: Ventas - Compras (neto). Las compras incluyen toda la empresa.</div><div class="tt-ref">Verde = positivo. Se afina una vez clasificadas las compras por categoria.</div></div></div>
+        <div class="expand-panel" id="panel-estado-resultado">
+          <div class="stock-loading" id="panel-er-loading">Cargando estado de resultado...</div>
+          <div id="panel-er-content" style="display:none;">
+            <h4>Ventas vs Compras &mdash; mensual (desde carga de precios)</h4>
+            <div id="panel-er-table"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- Inventario General -->
     <div class="section">
       <div class="section-title">Inventario General</div>
@@ -1676,6 +1690,8 @@ out.push({ month: period, value: k.value });
     loadVentasResumen();
     // Margen de venta sostenible (reposicion)
     loadMargenReposicion();
+    // Estado de resultado (ventas - compras)
+    loadEstadoResultado();
   }
 
   // Margen de venta sostenible (engorde). Techo = Ingresos - Muertes - Reposicion interna; se compara vs Venta pura a frigorifico.
@@ -2681,6 +2697,76 @@ out.push({ month: period, value: k.value });
     cont.innerHTML = h;
   }
 
+  // Carga las filas de compras (CSV) una sola vez; reusable desde Resumen y Compras
+  async function ensureComprasRows() {
+    if (comprasState.loaded) return true;
+    try {
+      const resp = await fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'compras' }) });
+      const text = await resp.text();
+      comprasState.rows = parseCompras(text);
+      comprasState.loaded = true;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // Estado de Resultado: Ventas (con precio) vs Compras (neto), mensual. Card en Resumen.
+  async function loadEstadoResultado() {
+    await ensureComprasRows();
+    if (!comprasState.ventasMesLoaded) {
+      try {
+        const data = await fetchEvents('salidas_lotes', VENTAS_PRICE_START, today());
+        const rows = Array.isArray(data) ? data : (data && (data.data || data.results)) || [];
+        const vm = {};
+        rows.forEach(r => {
+          if (!VENTA_SALE_TYPES.includes(r.event_type)) return;
+          if (esVentaInterna(r)) return;
+          if (r.price == null || r.price === '' || isNaN(+r.price)) return;
+          const m = String(r.event_date || '').slice(0, 7); if (!m) return;
+          vm[m] = (vm[m] || 0) + (+r.price || 0);
+        });
+        comprasState.ventasMes = vm;
+      } catch (e) { comprasState.ventasMes = {}; }
+      comprasState.ventasMesLoaded = true;
+    }
+    const cm = {};
+    (comprasState.rows || []).forEach(r => { cm[r.mes] = (cm[r.mes] || 0) + r.neto; });
+    comprasState.erCompras = cm;
+    const m = curMonthStr();
+    const v = (comprasState.ventasMes && comprasState.ventasMes[m]) || 0;
+    const c = cm[m] || 0;
+    const res = v - c;
+    setKpi('kpi-estado-resultado', fmtMoneyShort(res), null, null, true);
+    const card = document.getElementById('kpi-estado-resultado');
+    if (card) {
+      const vEl = card.querySelector('.kpi-value'); if (vEl) vEl.style.color = res >= 0 ? 'var(--green)' : 'var(--red)';
+      const b = card.querySelector('.kpi-bench');
+      if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Ventas ' + fmtMoneyShort(v) + ' &minus; Compras ' + fmtMoneyShort(c) + '</span>';
+    }
+  }
+
+  function loadEstadoResultadoPanel() {
+    const loading = document.getElementById('panel-er-loading');
+    const content = document.getElementById('panel-er-content');
+    const vm = comprasState.ventasMes || {}, cm = comprasState.erCompras || {};
+    const startMes = VENTAS_PRICE_START.slice(0, 7);
+    const meses = Array.from(new Set(Object.keys(vm).concat(Object.keys(cm)))).filter(x => x >= startMes).sort().reverse();
+    let h = '<table><thead><tr><th>Mes</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">Compras (neto)</th><th style="text-align:right;">Resultado</th><th style="text-align:right;">Margen</th></tr></thead><tbody>';
+    meses.forEach(mm => {
+      const v = vm[mm] || 0, c = cm[mm] || 0, res = v - c;
+      const margen = v ? (res / v * 100) : null;
+      h += '<tr><td>' + monthLabel(mm + '-01') + '</td>'
+        + '<td style="text-align:right;">' + fmtMoneyShort(v) + '</td>'
+        + '<td style="text-align:right;">' + fmtMoneyShort(c) + '</td>'
+        + '<td style="text-align:right;font-weight:700;color:' + (res >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmtMoneyShort(res) + '</td>'
+        + '<td style="text-align:right;color:var(--text-2);">' + (margen != null ? fmtNum(margen, 0) + '%' : '--') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    if (meses.length === 0) h = '<div class="table-empty">Sin datos</div>';
+    document.getElementById('panel-er-table').innerHTML = h;
+    if (loading) loading.style.display = 'none';
+    if (content) content.style.display = 'block';
+  }
+
   // Detalle de facturas de un proveedor (en el periodo seleccionado)
   function comprasFacturasHtml(key) {
     const fac = comprasSubset().filter(r => provKey(r) === key).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
@@ -2899,7 +2985,8 @@ out.push({ month: period, value: k.value });
     'kpi-ult-entrega': { panel: 'panel-entregas', loader: () => loadEntregasPanel() },
     'kpi-inv-total': { panel: 'panel-inv', loader: () => loadInventarioPanel() },
     'v-livianas': { panel: 'panel-v-livianas', loader: () => loadLivianasEvolucion('v-livianas') },
-    'kpi-r-livianas': { panel: 'panel-r-livianas', loader: () => loadLivianasEvolucion('r-livianas') }
+    'kpi-r-livianas': { panel: 'panel-r-livianas', loader: () => loadLivianasEvolucion('r-livianas') },
+    'kpi-estado-resultado': { panel: 'panel-estado-resultado', loader: () => loadEstadoResultadoPanel() }
   };
 
   // Generic click handler for all expandable cards
