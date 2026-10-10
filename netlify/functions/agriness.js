@@ -229,6 +229,28 @@ exports.handler = async (event) => {
       }
     }
 
+    // Mapeo de categorias de compras COMPARTIDO (Netlify Blobs). No requiere auth de Agriness.
+    if (action === 'cat_get') {
+      try {
+        const { getStore } = require('@netlify/blobs');
+        const store = getStore({ name: 'jofa-compras', consistency: 'strong' });
+        const data = await store.get('categorias', { type: 'json' });
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(data || { categorias: null, mapeo: {} }) };
+      } catch (e) {
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ categorias: null, mapeo: {}, _error: e.message }) };
+      }
+    }
+    if (action === 'cat_set') {
+      try {
+        const { getStore } = require('@netlify/blobs');
+        const store = getStore({ name: 'jofa-compras', consistency: 'strong' });
+        await store.setJSON('categorias', params || {});
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true }) };
+      } catch (e) {
+        return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: false, error: e.message }) };
+      }
+    }
+
     // Auth para sitio1 (farms, servicios, partos, destetes, etc.)
     const gatewayToken = await getWso2Token();
     let s4AccessToken = null;
