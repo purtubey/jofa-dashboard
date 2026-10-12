@@ -849,7 +849,8 @@ body {
           <option value="year">Anio actual</option>
         </select>
       </div>
-      <div id="ventas-nota" style="font-size:12px;color:var(--text-2);margin:-4px 0 14px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;"></div>
+      <div id="ventas-nota" style="font-size:12px;color:var(--text-2);margin:-4px 0 8px;padding:8px 12px;background:var(--bg-2);border-left:3px solid var(--blue);border-radius:4px;"></div>
+      <div id="ventas-pormag-ctrl" style="font-size:13px;color:var(--text-1);margin:0 0 14px;padding:8px 12px;background:var(--bg-2);border-radius:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"></div>
       <div id="ventas-anomalias" style="display:none;"></div>
       <div class="kpi-grid" id="kpi-ventas">
         <div class="kpi-card" id="v-ingreso"><div class="kpi-label">Ingreso Total</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Ingreso Total por Ventas</div><div class="tt-desc">Suma del valor de venta (campo price) de los lotes vendidos en el periodo.</div><div class="tt-calc">Calculo: Suma de price de eventos tipo venta.</div><div class="tt-ref">Solo cuenta ventas con precio cargado en Agriness.</div></div></div>
@@ -1966,7 +1967,36 @@ out.push({ month: period, value: k.value });
   const VENTAS_PESO_MINIMO = 110;     // kg: lotes con peso medio menor a esto = venta liviana (bandera)
   // Deteccion de anomalias de $/kg (errores de carga de precio)
   const VENTAS_PRKG_MIN_ABS = 500;        // $/kg por debajo de esto = error de carga grueso (divide por 10)
-  const VENTAS_PRECIO_PORMAG = 2250;      // PISO $/kg de referencia PORMAG para terminados. ACTUALIZAR cuando cambie el precio.
+  let VENTAS_PRECIO_PORMAG = 2370;        // PISO $/kg de referencia PORMAG (Capon) para terminados. Editable/compartido.
+  let VENTAS_PORMAG_UPDATED = '';         // fecha de ultima actualizacion del piso
+  let pormagCfgLoaded = false;
+  async function loadPormagCfg() {
+    try {
+      const r = await fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cfg_get' }) });
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d && d.pormag && !isNaN(+d.pormag)) VENTAS_PRECIO_PORMAG = +d.pormag;
+      if (d && d.pormagUpdated) VENTAS_PORMAG_UPDATED = d.pormagUpdated;
+    } catch (e) {}
+  }
+  function renderPormagCtrl() {
+    const el = document.getElementById('ventas-pormag-ctrl'); if (!el) return;
+    el.innerHTML = '<span style="color:var(--text-2);">Piso PORMAG (Capon):</span> $ '
+      + '<input id="pormag-input" type="number" value="' + VENTAS_PRECIO_PORMAG + '" style="width:85px;background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;"> /kg '
+      + '<button id="pormag-save" style="background:var(--blue);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Guardar</button>'
+      + '<span id="pormag-status" style="margin-left:8px;font-size:11px;color:var(--text-3);">' + (VENTAS_PORMAG_UPDATED ? ('actualizado ' + fmtDate(VENTAS_PORMAG_UPDATED)) : '') + '</span>';
+    const btn = document.getElementById('pormag-save');
+    if (btn) btn.addEventListener('click', function () {
+      const v = parseFloat(document.getElementById('pormag-input').value);
+      if (!v || isNaN(v) || v < 100) { alert('Precio invalido'); return; }
+      VENTAS_PRECIO_PORMAG = v; VENTAS_PORMAG_UPDATED = today();
+      const st = document.getElementById('pormag-status'); if (st) { st.textContent = 'Guardando...'; }
+      fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cfg_set', params: { pormag: v, pormagUpdated: today() } }) })
+        .then(function (r) { if (st) st.textContent = r.ok ? ('guardado ' + fmtDate(today())) : 'error al guardar'; })
+        .catch(function () { if (st) st.textContent = 'error al guardar'; });
+      loadVentas();
+    });
+  }
   const VENTAS_PESO_TERMINADO = 90;       // kg: a partir de este peso se considera terminado y aplica el piso PORMAG
   const VENTAS_PRKG_TOLERANCIA = 0.98;    // margen (2%) por redondeo antes de marcar bajo piso
 
@@ -2004,11 +2034,31 @@ out.push({ month: period, value: k.value });
     const p = ym.split('-').map(Number);
     return new Date(Date.UTC(p[0], p[1] - 2, 1)).toISOString().slice(0, 7);
   }
+  // $/kg marcado en el DTA (campo transport_document). JOFA ahora carga ahi el precio por kilo de cada venta.
+  // Se descartan valores fuera de rango (numeros de documento, etc.): el DTA valido es un $/kg entre 100 y 100.000.
+  function ventaPkDTA(r) {
+    const dta = r.transport_document;
+    if (dta == null || dta === '') return null;
+    const pk = +dta;
+    if (isNaN(pk) || pk < 100 || pk > 100000) return null;
+    return pk;
+  }
+  // Valor $ total de una venta: usa price si viene cargado (esquema viejo); si no, lo calcula con $/kg (DTA) x kg.
+  function ventaValor(r) {
+    if (r.price != null && r.price !== '' && !isNaN(+r.price)) return +r.price;
+    const pk = ventaPkDTA(r), w = +r.total_weight || 0;
+    return (pk != null && w) ? pk * w : null;
+  }
+  // $/kg efectivo de una venta (para detector de anomalias y tabla).
+  function ventaPk(r) {
+    const v = ventaValor(r), w = +r.total_weight || 0;
+    return (v != null && w) ? v / w : null;
+  }
   // Agrega una lista de ventas -> totales
   function aggVentas(list) {
     let cab = 0, kg = 0, ing = 0, kgP = 0, cabP = 0, cp = 0;
     list.forEach(r => {
-      const q = +r.quantity || 0, w = +r.total_weight || 0, p = (r.price != null && r.price !== '') ? +r.price : null;
+      const q = +r.quantity || 0, w = +r.total_weight || 0, p = ventaValor(r);
       cab += q; kg += w;
       if (p != null && !isNaN(p)) { ing += p; kgP += w; cabP += q; cp++; }
     });
@@ -2064,12 +2114,12 @@ out.push({ month: period, value: k.value });
   // Regla de negocio: un TERMINADO (peso >= VENTAS_PESO_TERMINADO) no se vende por debajo del piso PORMAG.
   // Animales mas livianos (descartes, etc.) quedan exentos del piso. Ademas se cazan errores gruesos de carga.
   function detectarAnomaliasPrkg(ventas) {
-    const priced = (r) => r.price != null && r.price !== '' && (+r.total_weight) > 0 && !isNaN(+r.price);
+    const priced = (r) => ventaValor(r) != null && (+r.total_weight) > 0;
     const conPrecio = ventas.filter(priced);
     const piso = VENTAS_PRECIO_PORMAG;
     const flagged = [];
     conPrecio.forEach(r => {
-      const pk = (+r.price) / (+r.total_weight);
+      const pk = ventaPk(r);
       const w = (+r.total_weight) / (+r.quantity || 1);
       const esTerminado = w >= VENTAS_PESO_TERMINADO;
       let motivo = null;
@@ -2154,7 +2204,7 @@ out.push({ month: period, value: k.value });
         M[m].cab += q; M[m].kg += w; M[m].n++;
         if (pw != null && pw < VENTAS_PESO_MINIMO) M[m].liv += q;
         if (ag != null) M[m].ageW += ag * q;
-        const p = (r.price != null && r.price !== '') ? +r.price : null;
+        const p = ventaValor(r);
         if (p != null && !isNaN(p)) { M[m].ing += p; M[m].kgP += w; }
       });
       // Serie ascendente con delta vs mes anterior
@@ -2220,6 +2270,8 @@ out.push({ month: period, value: k.value });
   }
 
   async function loadVentas() {
+    if (!pormagCfgLoaded) { await loadPormagCfg(); pormagCfgLoaded = true; }
+    renderPormagCtrl();
     const sel = document.getElementById('ventas-period');
     const period = sel ? sel.value : 'priceStart';
     const end = today();
@@ -2247,7 +2299,7 @@ out.push({ month: period, value: k.value });
         + (isSingle
             ? 'Comparativo <strong>vs mes anterior</strong> en las tarjetas. Movimientos internos (jofa sa, reposicion interna) se muestran aparte. '
             : 'Movimientos internos (jofa sa, reposicion interna) se muestran aparte, fuera de los totales. ')
-        + 'Piso PORMAG terminados: <strong>' + fmtMoney(VENTAS_PRECIO_PORMAG) + '/kg</strong> (actualizar en el codigo cuando cambie).';
+        + 'Piso PORMAG terminados (Capon): <strong>' + fmtMoney(VENTAS_PRECIO_PORMAG) + '/kg</strong> &mdash; editable abajo (sacalo de pormag.com, actualiza semanal).';
     }
 
     ['v-ingreso','v-cabezas','v-kg','v-prkg','v-prcab','v-pmedio'].forEach(id => {
@@ -2327,7 +2379,7 @@ out.push({ month: period, value: k.value });
       const f = (r.supplier_name || 'Sin dato').trim() || 'Sin dato';
       if (!byF[f]) byF[f] = { cab: 0, kg: 0, ing: 0, kgP: 0 };
       byF[f].cab += +r.quantity || 0; byF[f].kg += +r.total_weight || 0;
-      if (r.price != null && r.price !== '' && !isNaN(+r.price)) { byF[f].ing += +r.price; byF[f].kgP += +r.total_weight || 0; }
+      { const v = ventaValor(r); if (v != null) { byF[f].ing += v; byF[f].kgP += +r.total_weight || 0; } }
     });
     const frigList = Object.entries(byF).map(([name, v]) => ({ name, cab: v.cab, kg: v.kg, ing: v.ing, prkg: v.kgP ? v.ing / v.kgP : null }))
       .sort((a, b) => (b.ing - a.ing) || (b.cab - a.cab));
@@ -2347,7 +2399,7 @@ out.push({ month: period, value: k.value });
       const m = String(r.event_date || '').slice(0, 7);
       if (!m) return;
       if (!byM[m]) byM[m] = { ing: 0 };
-      if (r.price != null && r.price !== '' && !isNaN(+r.price)) byM[m].ing += +r.price;
+      { const v = ventaValor(r); if (v != null) byM[m].ing += v; }
     });
     const pts = Object.keys(byM).sort().map(m => ({ month: m + '-01', label: monthLabel(m + '-01'), value: byM[m].ing }));
     if (pts.length === 0) document.getElementById('ventas-evol').innerHTML = '<div class="table-empty">Sin ingresos para graficar</div>';
@@ -2355,7 +2407,7 @@ out.push({ month: period, value: k.value });
 
     // Tabla detalle (ventas reales)
     const tRows = ventas.slice().sort((a, b) => String(b.event_date || '').localeCompare(String(a.event_date || ''))).slice(0, 150).map(r => {
-      const q = +r.quantity || 0, w = +r.total_weight || 0, p = (r.price != null && r.price !== '') ? +r.price : null;
+      const q = +r.quantity || 0, w = +r.total_weight || 0, p = ventaValor(r), pkDta = ventaPkDTA(r);
       return [
         fmtDate(r.event_date),
         r.animal_group_name || '--',
@@ -2367,11 +2419,11 @@ out.push({ month: period, value: k.value });
         p != null ? fmtMoney(p) : '--',
         r.supplier_name || '--',
         r.invoice_number || '--',
-        r.transport_document || '--'
+        pkDta != null ? fmtMoney(pkDta) + '/kg' : (r.transport_document || '--')
       ];
     });
     if (tRows.length === 0) document.getElementById('table-ventas').innerHTML = '<div class="table-empty">Sin ventas registradas en el periodo</div>';
-    else renderTable('table-ventas', ['Fecha','Lote','Tipo','Cabezas','Peso Total','Peso Med (kg)','$/kg','Valor','Frigorifico','Factura','DTA'], tRows);
+    else renderTable('table-ventas', ['Fecha','Lote','Tipo','Cabezas','Peso Total','Peso Med (kg)','$/kg','Valor','Frigorifico','Factura','DTA ($/kg)'], tRows);
   }
 
   function renderVentasFrig(id, list, totalIng) {
@@ -2720,9 +2772,10 @@ out.push({ month: period, value: k.value });
         rows.forEach(r => {
           if (!VENTA_SALE_TYPES.includes(r.event_type)) return;
           if (esVentaInterna(r)) return;
-          if (r.price == null || r.price === '' || isNaN(+r.price)) return;
+          const v = ventaValor(r);
+          if (v == null) return;
           const m = String(r.event_date || '').slice(0, 7); if (!m) return;
-          vm[m] = (vm[m] || 0) + (+r.price || 0);
+          vm[m] = (vm[m] || 0) + v;
         });
         comprasState.ventasMes = vm;
       } catch (e) { comprasState.ventasMes = {}; }
