@@ -259,6 +259,25 @@ exports.handler = async (event) => {
         return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: false, error: e.message }) };
       }
     }
+    // Config general compartida (ej. piso PORMAG)
+    if (action === 'cfg_get') {
+      try {
+        const store = getCatStore();
+        const data = await store.get('config', { type: 'json' });
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) };
+      } catch (e) {
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ _error: e.message }) };
+      }
+    }
+    if (action === 'cfg_set') {
+      try {
+        const store = getCatStore();
+        await store.setJSON('config', params || {});
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true }) };
+      } catch (e) {
+        return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: false, error: e.message }) };
+      }
+    }
 
     // Auth para sitio1 (farms, servicios, partos, destetes, etc.)
     const gatewayToken = await getWso2Token();
