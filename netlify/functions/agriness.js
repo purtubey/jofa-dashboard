@@ -93,19 +93,8 @@ function getCatStore() {
 }
 
 // ---- Afip SDK: wslpg (Liquidaciones Primarias de Granos). JOFA como COMPRADOR (representada); cert de Pulporte. ----
-const AFIPSDK_TOKEN = process.env.AFIPSDK_TOKEN || '';
-// PEM: en env vars de Netlify los saltos de linea suelen quedar como "\n" literal o como CRLF.
-// Normalizamos a saltos reales para que el cert/key sean PEM validos.
-function pemFix(s) {
-  if (!s) return '';
-  let v = String(s).trim();
-  // quitar comillas envolventes si las pegaron
-  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-  v = v.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  return v.trim() + '\n';
-}
-const AFIP_CERT = pemFix(process.env.AFIP_CERT || '');
-const AFIP_KEY = pemFix(process.env.AFIP_KEY || '');
+// IMPORTANTE: el cert/key/token NO van en env vars (AWS Lambda limita el total de env vars a 4KB y el PEM lo excede).
+// Se guardan en Netlify Blobs (clave 'afip_secrets') y se leen en runtime. Solo datos chicos quedan en env.
 const AFIP_CERT_CUIT = process.env.AFIP_CERT_CUIT || '';              // CUIT del certificado (Pulporte) = tax_id en /auth
 const AFIP_JOFA_CUIT = process.env.AFIP_JOFA_CUIT || '30710762372';  // representada (JOFA) = auth.cuit
 const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '1')
@@ -113,16 +102,40 @@ const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '1')
 // Nombres aprox de granos (se puede refinar con tipoGranoConsultar). Fallback: "Grano <cod>".
 const GRANOS_NOMBRE = { 1: 'Poroto', 2: 'Maíz', 3: 'Soja', 14: 'Trigo', 23: 'Girasol', 29: 'Sorgo', 31: 'Cebada' };
 
-let wslpgTA = null; // { token, sign, exp }
+// PEM: normaliza saltos de linea (\n literal o CRLF) para que el cert/key sean PEM validos.
+function pemFix(s) {
+  if (!s) return '';
+  let v = String(s).trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+  v = v.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return v.trim() + '\n';
+}
 
-function afipPost(path, bodyObj) {
+let wslpgTA = null;          // { token, sign, exp }
+let afipSecretsCache = null; // { cert, key, token, exp }
+
+// Lee cert/key/token de Blobs (preferido) con fallback a env vars (por si alguien las deja chicas en dev).
+async function getAfipSecrets() {
+  if (afipSecretsCache && Date.now() < afipSecretsCache.exp) return afipSecretsCache;
+  let b = {};
+  try { b = (await getCatStore().get('afip_secrets', { type: 'json' })) || {}; } catch (e) { b = {}; }
+  afipSecretsCache = {
+    cert: pemFix(b.cert || process.env.AFIP_CERT || ''),
+    key: pemFix(b.key || process.env.AFIP_KEY || ''),
+    token: String(b.token || process.env.AFIPSDK_TOKEN || '').trim(),
+    exp: Date.now() + 5 * 60 * 1000,
+  };
+  return afipSecretsCache;
+}
+
+function afipPost(path, bodyObj, bearer) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(bodyObj);
     const options = {
       hostname: 'app.afipsdk.com', port: 443, path: path, method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + AFIPSDK_TOKEN,
+        'Authorization': 'Bearer ' + (bearer || ''),
         'Content-Length': Buffer.byteLength(payload),
       },
     };
@@ -139,10 +152,12 @@ function afipPost(path, bodyObj) {
 
 async function getWslpgTA(force) {
   if (!force && wslpgTA && Date.now() < wslpgTA.exp) return wslpgTA;
+  const s = await getAfipSecrets();
+  if (!s.token || !s.cert || !s.key) throw new Error('Faltan secretos Afip (cert/key/token) en Blobs; usar accion granos_secrets_set.');
   const r = await afipPost('/api/v1/afip/auth', {
     environment: 'prod', tax_id: String(AFIP_CERT_CUIT), wsid: 'wslpg',
-    cert: AFIP_CERT, key: AFIP_KEY, force_create: !!force,
-  });
+    cert: s.cert, key: s.key, force_create: !!force,
+  }, s.token);
   if (r.status === 200 && r.data && r.data.token && r.data.sign) {
     const exp = r.data.expirationTime ? (new Date(r.data.expirationTime).getTime() - 5 * 60 * 1000) : (Date.now() + 11 * 3600 * 1000);
     wslpgTA = { token: r.data.token, sign: r.data.sign, exp: exp };
@@ -152,9 +167,10 @@ async function getWslpgTA(force) {
 }
 
 async function wslpgRequest(method, extra) {
+  const s = await getAfipSecrets();
   const ta = await getWslpgTA(false);
   const params = Object.assign({ auth: { token: ta.token, sign: ta.sign, cuit: Number(AFIP_JOFA_CUIT) } }, extra || {});
-  return afipPost('/api/v1/afip/requests', { environment: 'prod', method: method, wsid: 'wslpg', params: params });
+  return afipPost('/api/v1/afip/requests', { environment: 'prod', method: method, wsid: 'wslpg', params: params }, s.token);
 }
 
 // Normaliza una liquidacion (liqConsReturn) a una fila de compra de grano.
@@ -372,27 +388,48 @@ exports.handler = async (event) => {
     }
 
     // ---- GRANOS (wslpg): liquidaciones primarias donde JOFA es comprador ----
-    const afipFaltan = (!AFIPSDK_TOKEN || !AFIP_CERT || !AFIP_KEY || !AFIP_CERT_CUIT);
+    // Carga de secretos Afip en Blobs (cert/key/token NO van en env vars por el limite de 4KB de Lambda).
+    if (action === 'granos_secrets_set') {
+      try {
+        const p = params || {};
+        if (!p.cert || !p.key) return J(200, { ok: false, error: 'Mandar al menos cert y key (token opcional si queda en env var).' });
+        const store = getCatStore();
+        let cur = {};
+        try { cur = (await store.get('afip_secrets', { type: 'json' })) || {}; } catch (e) { cur = {}; }
+        const cert = pemFix(p.cert), key = pemFix(p.key);
+        const token = p.token ? String(p.token).trim() : (cur.token || '');
+        await store.setJSON('afip_secrets', { cert: cert, key: key, token: token });
+        afipSecretsCache = null;
+        return J(200, {
+          ok: true,
+          cert: { largo: cert.length, begin: /^-----BEGIN /.test(cert), end: /-----\n?$/.test(cert) },
+          key: { largo: key.length, begin: /^-----BEGIN /.test(key) },
+          token: { guardado: !!token, largo: token.length },
+        });
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
+    }
 
     // Diagnostico de formato de cert/key (sin exponer contenido).
     if (action === 'granos_cert_check') {
-      const info = (pem, label) => ({
+      const s = await getAfipSecrets();
+      const info = (pem) => ({
         presente: !!pem, largo: pem ? pem.length : 0,
         empiezaBEGIN: /^-----BEGIN /.test(pem || ''),
         terminaEND: /-----\n?$/.test(pem || ''),
         lineas: pem ? pem.split('\n').length : 0,
       });
       return J(200, {
-        token: !!AFIPSDK_TOKEN, certCuit: AFIP_CERT_CUIT || null, jofaCuit: AFIP_JOFA_CUIT,
-        ptoEmis: AFIP_WSLPG_PTOEMIS,
-        cert: info(AFIP_CERT), key: info(AFIP_KEY),
-        certHeader: (AFIP_CERT || '').slice(0, 28), keyHeader: (AFIP_KEY || '').slice(0, 32),
+        fuente: 'blobs+env', token: !!s.token, tokenLargo: s.token ? s.token.length : 0,
+        certCuit: AFIP_CERT_CUIT || null, jofaCuit: AFIP_JOFA_CUIT, ptoEmis: AFIP_WSLPG_PTOEMIS,
+        cert: info(s.cert), key: info(s.key),
+        certHeader: (s.cert || '').slice(0, 28), keyHeader: (s.key || '').slice(0, 32),
       });
     }
 
     // Prueba de conexion/delegacion: ultimo nro por ptoEmision + una liquidacion de muestra.
     if (action === 'granos_debug') {
-      if (afipFaltan) return J(200, { ok: false, error: 'Faltan env vars: AFIPSDK_TOKEN / AFIP_CERT / AFIP_KEY / AFIP_CERT_CUIT' });
+      const sec = await getAfipSecrets();
+      if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip (cert/key/token via granos_secrets_set) o AFIP_CERT_CUIT.' });
       try {
         const out = { ok: true, representada: AFIP_JOFA_CUIT, cert: AFIP_CERT_CUIT, ptoEmis: {}, sample: null };
         for (const pe of AFIP_WSLPG_PTOEMIS) {
@@ -413,7 +450,7 @@ exports.handler = async (event) => {
 
     // Sincroniza nuevas liquidaciones (incremental, con tope para no exceder el timeout). Guarda en Blobs 'granos'.
     if (action === 'granos_sync') {
-      if (afipFaltan) return J(200, { ok: false, error: 'Faltan env vars de Afip SDK' });
+      { const sec = await getAfipSecrets(); if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip (cert/key/token via granos_secrets_set) o AFIP_CERT_CUIT.' }); }
       try {
         const limit = Math.min(Math.max(parseInt((params && params.limit) || 8, 10) || 8, 1), 25);
         const store = getCatStore();
