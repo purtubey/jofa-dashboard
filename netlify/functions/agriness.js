@@ -100,7 +100,7 @@ const AFIP_JOFA_CUIT = process.env.AFIP_JOFA_CUIT || '30710762372';  // represen
 const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '1')
   .split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
 // Nombres aprox de granos (se puede refinar con tipoGranoConsultar). Fallback: "Grano <cod>".
-const GRANOS_NOMBRE = { 1: 'Poroto', 2: 'Maíz', 3: 'Soja', 14: 'Trigo', 23: 'Girasol', 29: 'Sorgo', 31: 'Cebada' };
+const GRANOS_NOMBRE = { 2: 'Maíz', 3: 'Soja', 14: 'Trigo', 23: 'Girasol', 29: 'Sorgo', 31: 'Cebada', 34: 'Poroto' };
 
 // PEM: normaliza saltos de linea (\n literal o CRLF) para que el cert/key sean PEM validos.
 function pemFix(s) {
@@ -166,10 +166,11 @@ async function getWslpgTA(force) {
   throw new Error('Afip SDK auth wslpg fallo (' + r.status + '): ' + JSON.stringify(r.data).slice(0, 300));
 }
 
-async function wslpgRequest(method, extra) {
+async function wslpgRequest(method, extra, cuitRep) {
   const s = await getAfipSecrets();
   const ta = await getWslpgTA(false);
-  const params = Object.assign({ auth: { token: ta.token, sign: ta.sign, cuit: Number(AFIP_JOFA_CUIT) } }, extra || {});
+  const cuit = Number(cuitRep || AFIP_JOFA_CUIT);
+  const params = Object.assign({ auth: { token: ta.token, sign: ta.sign, cuit: cuit } }, extra || {});
   return afipPost('/api/v1/afip/requests', { environment: 'prod', method: method, wsid: 'wslpg', params: params }, s.token);
 }
 
@@ -433,16 +434,38 @@ exports.handler = async (event) => {
       const from = Math.max(parseInt((params && params.from) || 1, 10) || 1, 0);
       let to = Math.max(parseInt((params && params.to) || (from + 5), 10) || (from + 5), from);
       if (to - from > 7) to = from + 7; // tope por timeout (~1.5s por punto)
+      const cuitRep = (params && params.cuit) ? String(params.cuit) : AFIP_JOFA_CUIT;
       const res = {};
       try {
         for (let pe = from; pe <= to; pe++) {
-          const r = await wslpgRequest('liquidacionUltimoNroOrdenConsultar', { ptoEmision: pe });
+          const r = await wslpgRequest('liquidacionUltimoNroOrdenConsultar', { ptoEmision: pe }, cuitRep);
           const ret = (r.data && (r.data.liqUltNroOrdenReturn || r.data)) || {};
           const err = ret.errores && ret.errores.error;
           res[pe] = { nroOrden: ret.nroOrden != null ? ret.nroOrden : null, errores: err || null, status: r.status };
         }
-        return J(200, { ok: true, desde: from, hasta: to, res: res });
+        return J(200, { ok: true, representada: cuitRep, desde: from, hasta: to, res: res });
       } catch (e) { return J(200, { ok: false, desde: from, parcial: res, error: e.message }); }
+    }
+
+    // Consulta una liquidacion por COE (revela ptoEmision/nroOrden y confirma la representacion).
+    if (action === 'granos_coe') {
+      const sec = await getAfipSecrets();
+      if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip.' });
+      const coe = params && params.coe;
+      if (!coe) return J(200, { ok: false, error: 'Falta coe.' });
+      const cuitRep = (params && params.cuit) ? String(params.cuit) : AFIP_JOFA_CUIT;
+      try {
+        const r = await wslpgRequest('liquidacionXCoeConsultar', { coe: Number(coe), pdf: 'N' }, cuitRep);
+        const lc = (r.data && (r.data.liqConsReturn || r.data)) || {};
+        const L = lc.liquidacion || {};
+        const err = (lc.errores && lc.errores.error) || null;
+        return J(200, {
+          ok: true, representada: cuitRep, status: r.status, errores: err,
+          ptoEmision: L.ptoEmision != null ? L.ptoEmision : null, nroOrden: L.nroOrden != null ? L.nroOrden : null,
+          cuitComprador: L.cuitComprador || null, cuitVendedor: L.cuitVendedor || null,
+          normalizado: (lc.liquidacion || lc.autorizacion) ? normLiqGrano(lc, L.ptoEmision, L.nroOrden) : null,
+        });
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
     }
 
     // Prueba de conexion/delegacion: ultimo nro por ptoEmision + una liquidacion de muestra.
