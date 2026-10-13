@@ -94,8 +94,18 @@ function getCatStore() {
 
 // ---- Afip SDK: wslpg (Liquidaciones Primarias de Granos). JOFA como COMPRADOR (representada); cert de Pulporte. ----
 const AFIPSDK_TOKEN = process.env.AFIPSDK_TOKEN || '';
-const AFIP_CERT = process.env.AFIP_CERT || '';
-const AFIP_KEY = process.env.AFIP_KEY || '';
+// PEM: en env vars de Netlify los saltos de linea suelen quedar como "\n" literal o como CRLF.
+// Normalizamos a saltos reales para que el cert/key sean PEM validos.
+function pemFix(s) {
+  if (!s) return '';
+  let v = String(s).trim();
+  // quitar comillas envolventes si las pegaron
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+  v = v.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return v.trim() + '\n';
+}
+const AFIP_CERT = pemFix(process.env.AFIP_CERT || '');
+const AFIP_KEY = pemFix(process.env.AFIP_KEY || '');
 const AFIP_CERT_CUIT = process.env.AFIP_CERT_CUIT || '';              // CUIT del certificado (Pulporte) = tax_id en /auth
 const AFIP_JOFA_CUIT = process.env.AFIP_JOFA_CUIT || '30710762372';  // representada (JOFA) = auth.cuit
 const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '1')
@@ -363,6 +373,22 @@ exports.handler = async (event) => {
 
     // ---- GRANOS (wslpg): liquidaciones primarias donde JOFA es comprador ----
     const afipFaltan = (!AFIPSDK_TOKEN || !AFIP_CERT || !AFIP_KEY || !AFIP_CERT_CUIT);
+
+    // Diagnostico de formato de cert/key (sin exponer contenido).
+    if (action === 'granos_cert_check') {
+      const info = (pem, label) => ({
+        presente: !!pem, largo: pem ? pem.length : 0,
+        empiezaBEGIN: /^-----BEGIN /.test(pem || ''),
+        terminaEND: /-----\n?$/.test(pem || ''),
+        lineas: pem ? pem.split('\n').length : 0,
+      });
+      return J(200, {
+        token: !!AFIPSDK_TOKEN, certCuit: AFIP_CERT_CUIT || null, jofaCuit: AFIP_JOFA_CUIT,
+        ptoEmis: AFIP_WSLPG_PTOEMIS,
+        cert: info(AFIP_CERT), key: info(AFIP_KEY),
+        certHeader: (AFIP_CERT || '').slice(0, 28), keyHeader: (AFIP_KEY || '').slice(0, 32),
+      });
+    }
 
     // Prueba de conexion/delegacion: ultimo nro por ptoEmision + una liquidacion de muestra.
     if (action === 'granos_debug') {
