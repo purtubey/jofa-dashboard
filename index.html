@@ -689,16 +689,18 @@ body {
     </div>
     <!-- Estado de Resultado -->
     <div class="section">
-      <div class="section-title">Estado de Resultado (mes en curso)</div>
+      <div class="section-title">Resultado del mes (parcial)</div>
       <div class="kpi-grid" id="kpi-resumen-resultado">
-        <div class="kpi-card kpi-expandable" id="kpi-estado-resultado"><div class="kpi-label">Resultado (Ventas &minus; Compras)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Estado de Resultado</div><div class="tt-desc">Ingresos por ventas (con precio cargado) menos costos de compras (neto) del mes. Click para ver la evolucion mensual.</div><div class="tt-calc">Calculo: Ventas - Compras (neto). Las compras incluyen toda la empresa.</div><div class="tt-ref">Verde = positivo. Se afina una vez clasificadas las compras por categoria.</div></div></div>
+        <div class="kpi-card kpi-expandable" id="kpi-estado-resultado"><div class="kpi-label">Resultado del mes (parcial)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Resultado del mes (parcial)</div><div class="tt-desc">Resultado parcial del mes: ventas (con precio cargado) menos compras (neto) menos sueldos. Click para ver la evolucion mensual.</div><div class="tt-calc">Calculo: Ventas - Compras (neto) - Sueldos. PARCIAL: las compras aun no incluyen granos y los sueldos son solo brutos (sin cargas patronales). No es el resultado final.</div><div class="tt-ref">Verde = positivo. Se completa al sumar granos y cargas sociales (F.931).</div></div></div>
         <div class="expand-panel" id="panel-estado-resultado">
           <div class="stock-loading" id="panel-er-loading">Cargando estado de resultado...</div>
           <div id="panel-er-content" style="display:none;">
-            <h4>Ventas vs Compras &mdash; mensual (desde carga de precios)</h4>
+            <h4>Ventas vs Compras vs Sueldos &mdash; mensual (desde carga de precios)</h4>
+            <div id="er-sueldos-ctrl" style="margin:0 0 10px;font-size:12px;color:var(--text-2);"></div>
             <div id="panel-er-table"></div>
           </div>
         </div>
+        <div class="kpi-card" id="kpi-costo-laboral"><div class="kpi-label">Costo Laboral <span style="font-size:9px;background:var(--yellow);color:#000;border-radius:4px;padding:1px 5px;vertical-align:middle;font-weight:700;">PENDIENTE</span></div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Costo Laboral Total</div><div class="tt-desc">Costo laboral real del mes: sueldos brutos (Libro Ley) + cargas sociales patronales (contribuciones + ART).</div><div class="tt-calc">Calculo: Brutos + Cargas patronales. Hoy solo brutos; faltan las cargas del F.931.</div><div class="tt-ref">Queda en PENDIENTE hasta cargar las contribuciones patronales (F.931).</div></div></div>
       </div>
     </div>
     <!-- Inventario General -->
@@ -1969,6 +1971,8 @@ out.push({ month: period, value: k.value });
   const VENTAS_PRKG_MIN_ABS = 500;        // $/kg por debajo de esto = error de carga grueso (divide por 10)
   let VENTAS_PRECIO_PORMAG = 2370;        // PISO $/kg de referencia PORMAG (Capon) para terminados. Editable/compartido.
   let VENTAS_PORMAG_UPDATED = '';         // fecha de ultima actualizacion del piso
+  let SUELDOS_MES = {};                   // sueldos (brutos Libro Ley) por mes: { '2026-09': 31022697, ... }. Compartido.
+  let CARGAS_MES = {};                    // cargas patronales (F.931) por mes. Pendiente de carga; cuando exista, completa el Costo Laboral.
   let pormagCfgLoaded = false;
   async function loadPormagCfg() {
     try {
@@ -1977,7 +1981,13 @@ out.push({ month: period, value: k.value });
       const d = await r.json();
       if (d && d.pormag && !isNaN(+d.pormag)) VENTAS_PRECIO_PORMAG = +d.pormag;
       if (d && d.pormagUpdated) VENTAS_PORMAG_UPDATED = d.pormagUpdated;
+      if (d && d.sueldos && typeof d.sueldos === 'object') SUELDOS_MES = d.sueldos;
+      if (d && d.cargas && typeof d.cargas === 'object') CARGAS_MES = d.cargas;
     } catch (e) {}
+  }
+  // Guarda el mapa de sueldos completo (merge en server). Devuelve la promesa del fetch.
+  function saveSueldos() {
+    return fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cfg_set', params: { sueldos: SUELDOS_MES } }) });
   }
   function renderPormagCtrl() {
     const el = document.getElementById('ventas-pormag-ctrl'); if (!el) return;
@@ -2761,8 +2771,9 @@ out.push({ month: period, value: k.value });
     } catch (e) { return false; }
   }
 
-  // Estado de Resultado: Ventas (con precio) vs Compras (neto), mensual. Card en Resumen.
+  // Estado de Resultado: Ventas (con precio) vs Compras (neto) vs Sueldos, mensual. Card en Resumen.
   async function loadEstadoResultado() {
+    if (!pormagCfgLoaded) { await loadPormagCfg(); pormagCfgLoaded = true; }
     await ensureComprasRows();
     if (!comprasState.ventasMesLoaded) {
       try {
@@ -2787,14 +2798,35 @@ out.push({ month: period, value: k.value });
     const m = curMonthStr();
     const v = (comprasState.ventasMes && comprasState.ventasMes[m]) || 0;
     const c = cm[m] || 0;
-    const res = v - c;
+    const s = (SUELDOS_MES && +SUELDOS_MES[m]) || 0;
+    const res = v - c - s;
     setKpi('kpi-estado-resultado', fmtMoneyShort(res), null, null, true);
     const card = document.getElementById('kpi-estado-resultado');
     if (card) {
       const vEl = card.querySelector('.kpi-value'); if (vEl) vEl.style.color = res >= 0 ? 'var(--green)' : 'var(--red)';
       const b = card.querySelector('.kpi-bench');
-      if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Ventas ' + fmtMoneyShort(v) + ' &minus; Compras ' + fmtMoneyShort(c) + '</span>';
+      if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Ventas ' + fmtMoneyShort(v) + ' &minus; Compras ' + fmtMoneyShort(c) + (s ? ' &minus; Sueldos ' + fmtMoneyShort(s) : '') + '</span>';
     }
+    renderCostoLaboral(m, s);
+  }
+
+  // Card Costo Laboral: brutos + cargas patronales. En PENDIENTE hasta cargar las cargas (F.931).
+  function renderCostoLaboral(m, brutos) {
+    const card = document.getElementById('kpi-costo-laboral'); if (!card) return;
+    const cargas = (CARGAS_MES && +CARGAS_MES[m]) || 0;
+    const vEl = card.querySelector('.kpi-value');
+    const b = card.querySelector('.kpi-bench');
+    if (vEl) vEl.classList.remove('loading');
+    if (!brutos) {
+      if (vEl) { vEl.textContent = 's/datos'; vEl.style.color = 'var(--text-3)'; }
+      if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Sin sueldos cargados para ' + monthLabel(m + '-01') + '</span>';
+      return;
+    }
+    const total = brutos + cargas;
+    if (vEl) { vEl.textContent = fmtMoneyShort(total); vEl.style.color = cargas ? 'var(--text-0)' : 'var(--yellow)'; }
+    if (b) b.innerHTML = cargas
+      ? '<span style="font-size:11px;color:var(--text-3);">Brutos ' + fmtMoneyShort(brutos) + ' + Cargas ' + fmtMoneyShort(cargas) + '</span>'
+      : '<span style="font-size:11px;color:var(--text-3);">Brutos ' + fmtMoneyShort(brutos) + ' &middot; <span style="color:var(--yellow);">+ cargas patronales pendientes (F.931)</span></span>';
   }
 
   function loadEstadoResultadoPanel() {
@@ -2803,21 +2835,53 @@ out.push({ month: period, value: k.value });
     const vm = comprasState.ventasMes || {}, cm = comprasState.erCompras || {};
     const startMes = VENTAS_PRICE_START.slice(0, 7);
     const meses = Array.from(new Set(Object.keys(vm).concat(Object.keys(cm)))).filter(x => x >= startMes).sort().reverse();
-    let h = '<table><thead><tr><th>Mes</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">Compras (neto)</th><th style="text-align:right;">Resultado</th><th style="text-align:right;">Margen</th></tr></thead><tbody>';
+    let h = '<table><thead><tr><th>Mes</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">Compras (neto)</th><th style="text-align:right;">Sueldos</th><th style="text-align:right;">Resultado</th><th style="text-align:right;">Margen</th></tr></thead><tbody>';
     meses.forEach(mm => {
-      const v = vm[mm] || 0, c = cm[mm] || 0, res = v - c;
+      const v = vm[mm] || 0, c = cm[mm] || 0, s = (SUELDOS_MES && +SUELDOS_MES[mm]) || 0, res = v - c - s;
       const margen = v ? (res / v * 100) : null;
       h += '<tr><td>' + monthLabel(mm + '-01') + '</td>'
         + '<td style="text-align:right;">' + fmtMoneyShort(v) + '</td>'
         + '<td style="text-align:right;">' + fmtMoneyShort(c) + '</td>'
+        + '<td style="text-align:right;color:' + (s ? 'var(--text-1)' : 'var(--text-3)') + ';">' + (s ? fmtMoneyShort(s) : '&mdash;') + '</td>'
         + '<td style="text-align:right;font-weight:700;color:' + (res >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmtMoneyShort(res) + '</td>'
         + '<td style="text-align:right;color:var(--text-2);">' + (margen != null ? fmtNum(margen, 0) + '%' : '--') + '</td></tr>';
     });
     h += '</tbody></table>';
     if (meses.length === 0) h = '<div class="table-empty">Sin datos</div>';
     document.getElementById('panel-er-table').innerHTML = h;
+    renderSueldosCtrl(meses);
     if (loading) loading.style.display = 'none';
     if (content) content.style.display = 'block';
+  }
+
+  // Editor de sueldos (brutos del Libro Ley) por mes. Compartido via config (Blobs).
+  function renderSueldosCtrl(meses) {
+    const el = document.getElementById('er-sueldos-ctrl'); if (!el) return;
+    const curM = curMonthStr();
+    // opciones de mes: desde carga de precios hasta el mes actual (los que hay en la tabla + actual)
+    const opts = Array.from(new Set((meses || []).concat([curM]))).sort().reverse();
+    const sel = '<select id="sueldos-mes" style="background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">'
+      + opts.map(mm => '<option value="' + mm + '"' + (mm === curM ? ' selected' : '') + '>' + monthLabel(mm + '-01') + '</option>').join('') + '</select>';
+    el.innerHTML = '<span style="color:var(--text-2);">Sueldos (brutos Libro Ley) de </span>' + sel
+      + ' $ <input id="sueldos-input" type="number" style="width:130px;background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">'
+      + ' <button id="sueldos-save" style="background:var(--blue);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Guardar</button>'
+      + ' <span id="sueldos-status" style="margin-left:6px;font-size:11px;color:var(--text-3);"></span>'
+      + '<div style="margin-top:4px;font-size:11px;color:var(--text-3);">Solo brutos por ahora; faltan cargas patronales (F.931).</div>';
+    const mSel = document.getElementById('sueldos-mes');
+    const inp = document.getElementById('sueldos-input');
+    function refresh() { const mm = mSel.value; inp.value = (SUELDOS_MES && SUELDOS_MES[mm] != null) ? SUELDOS_MES[mm] : ''; }
+    refresh();
+    if (mSel) mSel.addEventListener('change', refresh);
+    const btn = document.getElementById('sueldos-save');
+    if (btn) btn.addEventListener('click', function () {
+      const mm = mSel.value; const raw = inp.value.trim();
+      const st = document.getElementById('sueldos-status');
+      if (raw === '') { delete SUELDOS_MES[mm]; }
+      else { const v = parseFloat(raw); if (isNaN(v) || v < 0) { alert('Monto invalido'); return; } SUELDOS_MES[mm] = Math.round(v); }
+      if (st) st.textContent = 'Guardando...';
+      saveSueldos().then(function (r) { if (st) st.textContent = r.ok ? ('guardado ' + fmtDate(today())) : 'error al guardar'; loadEstadoResultado(); loadEstadoResultadoPanel(); })
+        .catch(function () { if (st) st.textContent = 'error al guardar'; });
+    });
   }
 
   // Detalle de facturas de un proveedor (en el periodo seleccionado)
