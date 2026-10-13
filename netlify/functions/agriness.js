@@ -92,6 +92,82 @@ function getCatStore() {
   return getStore({ name: 'jofa-compras', consistency: 'strong' });
 }
 
+// ---- Afip SDK: wslpg (Liquidaciones Primarias de Granos). JOFA como COMPRADOR (representada); cert de Pulporte. ----
+const AFIPSDK_TOKEN = process.env.AFIPSDK_TOKEN || '';
+const AFIP_CERT = process.env.AFIP_CERT || '';
+const AFIP_KEY = process.env.AFIP_KEY || '';
+const AFIP_CERT_CUIT = process.env.AFIP_CERT_CUIT || '';              // CUIT del certificado (Pulporte) = tax_id en /auth
+const AFIP_JOFA_CUIT = process.env.AFIP_JOFA_CUIT || '30710762372';  // representada (JOFA) = auth.cuit
+const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '1')
+  .split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+// Nombres aprox de granos (se puede refinar con tipoGranoConsultar). Fallback: "Grano <cod>".
+const GRANOS_NOMBRE = { 1: 'Poroto', 2: 'Maíz', 3: 'Soja', 14: 'Trigo', 23: 'Girasol', 29: 'Sorgo', 31: 'Cebada' };
+
+let wslpgTA = null; // { token, sign, exp }
+
+function afipPost(path, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(bodyObj);
+    const options = {
+      hostname: 'app.afipsdk.com', port: 443, path: path, method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + AFIPSDK_TOKEN,
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => { try { resolve({ status: res.statusCode, data: JSON.parse(data) }); } catch { resolve({ status: res.statusCode, data: data }); } });
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout Afip SDK')); });
+    req.write(payload); req.end();
+  });
+}
+
+async function getWslpgTA(force) {
+  if (!force && wslpgTA && Date.now() < wslpgTA.exp) return wslpgTA;
+  const r = await afipPost('/api/v1/afip/auth', {
+    environment: 'prod', tax_id: String(AFIP_CERT_CUIT), wsid: 'wslpg',
+    cert: AFIP_CERT, key: AFIP_KEY, force_create: !!force,
+  });
+  if (r.status === 200 && r.data && r.data.token && r.data.sign) {
+    const exp = r.data.expirationTime ? (new Date(r.data.expirationTime).getTime() - 5 * 60 * 1000) : (Date.now() + 11 * 3600 * 1000);
+    wslpgTA = { token: r.data.token, sign: r.data.sign, exp: exp };
+    return wslpgTA;
+  }
+  throw new Error('Afip SDK auth wslpg fallo (' + r.status + '): ' + JSON.stringify(r.data).slice(0, 300));
+}
+
+async function wslpgRequest(method, extra) {
+  const ta = await getWslpgTA(false);
+  const params = Object.assign({ auth: { token: ta.token, sign: ta.sign, cuit: Number(AFIP_JOFA_CUIT) } }, extra || {});
+  return afipPost('/api/v1/afip/requests', { environment: 'prod', method: method, wsid: 'wslpg', params: params });
+}
+
+// Normaliza una liquidacion (liqConsReturn) a una fila de compra de grano.
+function normLiqGrano(ret, ptoEmision, nroOrden) {
+  const L = (ret && ret.liquidacion) || {};
+  const A = (ret && ret.autorizacion) || {};
+  const fecha = A.fechaLiquidacion || L.fechaPrecioOperacion || '';
+  return {
+    origen: 'granos', ptoEmision: ptoEmision, nroOrden: nroOrden,
+    fecha: fecha, mes: String(fecha).slice(0, 7),
+    cuitVendedor: L.cuitVendedor || null,
+    codGrano: L.codGrano != null ? L.codGrano : null,
+    grano: GRANOS_NOMBRE[L.codGrano] || ('Grano ' + (L.codGrano != null ? L.codGrano : '?')),
+    kg: Number(A.totalPesoNeto || L.pesoNetoSinCertificado || 0),
+    neto: Number(A.subTotal || 0),
+    iva: Number(A.importeIva || 0),
+    total: Number(A.operacionConIva || 0),
+    retenciones: Number(A.totalRetencion || 0),
+    netoAPagar: Number(A.totalNetoAPagar || 0),
+    coe: A.coe || null, estado: A.estado || '', campania: L.campaniaPPal || null,
+  };
+}
+
 async function getWso2Token() {
   if (wso2Token && Date.now() < wso2TokenExpiry) return wso2Token;
 
@@ -213,6 +289,8 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders, body: '' };
   }
 
+  const J = (s, o) => ({ statusCode: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(o) });
+
   try {
     if (!WSO2_CONSUMER_KEY || !WSO2_CONSUMER_SECRET || !S4_USERNAME || !S4_PASSWORD) {
       return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -281,6 +359,71 @@ exports.handler = async (event) => {
       } catch (e) {
         return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: false, error: e.message }) };
       }
+    }
+
+    // ---- GRANOS (wslpg): liquidaciones primarias donde JOFA es comprador ----
+    const afipFaltan = (!AFIPSDK_TOKEN || !AFIP_CERT || !AFIP_KEY || !AFIP_CERT_CUIT);
+
+    // Prueba de conexion/delegacion: ultimo nro por ptoEmision + una liquidacion de muestra.
+    if (action === 'granos_debug') {
+      if (afipFaltan) return J(200, { ok: false, error: 'Faltan env vars: AFIPSDK_TOKEN / AFIP_CERT / AFIP_KEY / AFIP_CERT_CUIT' });
+      try {
+        const out = { ok: true, representada: AFIP_JOFA_CUIT, cert: AFIP_CERT_CUIT, ptoEmis: {}, sample: null };
+        for (const pe of AFIP_WSLPG_PTOEMIS) {
+          const r = await wslpgRequest('liquidacionUltimoNroOrdenConsultar', { ptoEmision: pe });
+          const ret = (r.data && (r.data.liqUltNroOrdenReturn || r.data)) || {};
+          const nro = ret.nroOrden;
+          const err = ret.errores && ret.errores.error;
+          out.ptoEmis[pe] = { status: r.status, nroOrden: nro != null ? nro : null, errores: err || null };
+          if (!out.sample && nro && Number(nro) > 0) {
+            const r2 = await wslpgRequest('liquidacionXNroOrdenConsultar', { ptoEmision: pe, nroOrden: Number(nro) });
+            const lc = (r2.data && (r2.data.liqConsReturn || r2.data)) || {};
+            out.sample = { ptoEmision: pe, nroOrden: Number(nro), normalizado: normLiqGrano(lc, pe, Number(nro)), errores: (lc.errores && lc.errores.error) || null };
+          }
+        }
+        return J(200, out);
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
+    }
+
+    // Sincroniza nuevas liquidaciones (incremental, con tope para no exceder el timeout). Guarda en Blobs 'granos'.
+    if (action === 'granos_sync') {
+      if (afipFaltan) return J(200, { ok: false, error: 'Faltan env vars de Afip SDK' });
+      try {
+        const limit = Math.min(Math.max(parseInt((params && params.limit) || 8, 10) || 8, 1), 25);
+        const store = getCatStore();
+        let g = (await store.get('granos', { type: 'json' })) || { updated: null, items: [], cursor: {} };
+        if (!Array.isArray(g.items)) g.items = [];
+        if (!g.cursor) g.cursor = {};
+        const idx = {}; g.items.forEach((it) => { idx[it.ptoEmision + '-' + it.nroOrden] = true; });
+        let fetched = 0; const progress = {};
+        for (const pe of AFIP_WSLPG_PTOEMIS) {
+          const r = await wslpgRequest('liquidacionUltimoNroOrdenConsultar', { ptoEmision: pe });
+          const ret = (r.data && (r.data.liqUltNroOrdenReturn || r.data)) || {};
+          const last = Number(ret.nroOrden) || 0;
+          const from = (g.cursor[pe] || 0) + 1;
+          progress[pe] = { last: last, desde: from, traidas: 0 };
+          for (let n = from; n <= last && fetched < limit; n++) {
+            const r2 = await wslpgRequest('liquidacionXNroOrdenConsultar', { ptoEmision: pe, nroOrden: n });
+            const lc = (r2.data && (r2.data.liqConsReturn || r2.data)) || {};
+            if (lc && (lc.autorizacion || lc.liquidacion)) {
+              if (!idx[pe + '-' + n]) { g.items.push(normLiqGrano(lc, pe, n)); idx[pe + '-' + n] = true; progress[pe].traidas++; }
+            }
+            g.cursor[pe] = n; fetched++;
+          }
+        }
+        g.updated = new Date().toISOString();
+        await store.setJSON('granos', g);
+        return J(200, { ok: true, fetched: fetched, total: g.items.length, progress: progress, updated: g.updated });
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
+    }
+
+    // Devuelve las liquidaciones cacheadas (rapido, para el dashboard).
+    if (action === 'granos_get') {
+      try {
+        const store = getCatStore();
+        const g = (await store.get('granos', { type: 'json' })) || { items: [], updated: null };
+        return J(200, { items: g.items || [], updated: g.updated || null });
+      } catch (e) { return J(200, { items: [], _error: e.message }); }
     }
 
     // Auth para sitio1 (farms, servicios, partos, destetes, etc.)
