@@ -2530,7 +2530,34 @@ out.push({ month: period, value: k.value });
   }
 
   function provKey(r) { return (r.cuit && r.cuit.trim()) ? r.cuit.trim() : (r.proveedor || '').trim().toLowerCase(); }
-  function catOf(r) { return comprasState.catMap[provKey(r)] || 'Sin clasificar'; }
+  function catOf(r) { if (r.origen === 'granos') return 'Granos'; return comprasState.catMap[provKey(r)] || 'Sin clasificar'; }
+
+  // Trae las liquidaciones de granos (wslpg, JOFA comprador) y las mergea como filas de compra (rubro Granos).
+  async function mergeGranos() {
+    if (comprasState.granosLoaded) return;
+    comprasState.granosLoaded = true;
+    try {
+      const r = await fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'granos_get' }) });
+      if (!r.ok) return;
+      const d = await r.json();
+      const items = (d && Array.isArray(d.items)) ? d.items : [];
+      comprasState.granosUpdated = d && d.updated;
+      const rows = items.filter(x => String(x.estado || '').toUpperCase() !== 'ANULADA').map(x => ({
+        fecha: x.fecha || '', mes: x.mes || String(x.fecha || '').slice(0, 7),
+        tipo: 'Liquidación granos' + (x.grano ? ' (' + x.grano + ')' : ''),
+        numero: String(x.nroOrden || ''), pv: String(x.ptoEmision || ''),
+        proveedor: x.cuitVendedor ? ('Productor ' + x.cuitVendedor) : 'Productor granos',
+        cuit: x.cuitVendedor ? String(x.cuitVendedor) : '',
+        neto: +x.neto || 0, iva: +x.iva || 0, total: +x.total || 0,
+        actualizado: '', origen: 'granos', grano: x.grano, kg: +x.kg || 0, coe: x.coe
+      }));
+      if (rows.length && Array.isArray(comprasState.rows)) {
+        // evitar duplicar si ya se mergeo
+        const yaGranos = comprasState.rows.some(r => r.origen === 'granos');
+        if (!yaGranos) comprasState.rows = comprasState.rows.concat(rows);
+      }
+    } catch (e) {}
+  }
   function cNum(x) { x = (x == null ? '' : String(x)).trim().replace(/\\/g, ''); if (!x || x === '-') return 0; const n = parseFloat(x); return isNaN(n) ? 0 : n; }
 
   function parseCsvLine(line) {
@@ -2600,6 +2627,7 @@ out.push({ month: period, value: k.value });
         return;
       }
     }
+    await mergeGranos();
     // Mapeo de categorias COMPARTIDO (servidor). Primera vez sobreescribe el cache local.
     if (!comprasState.catServerLoaded) { await catServerLoad(); comprasState.catServerLoaded = true; }
     // Produccion mensual (Agriness) para el cruce de costo por kg / cabeza
@@ -2761,14 +2789,16 @@ out.push({ month: period, value: k.value });
 
   // Carga las filas de compras (CSV) una sola vez; reusable desde Resumen y Compras
   async function ensureComprasRows() {
-    if (comprasState.loaded) return true;
-    try {
-      const resp = await fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'compras' }) });
-      const text = await resp.text();
-      comprasState.rows = parseCompras(text);
-      comprasState.loaded = true;
-      return true;
-    } catch (e) { return false; }
+    if (!comprasState.loaded) {
+      try {
+        const resp = await fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'compras' }) });
+        const text = await resp.text();
+        comprasState.rows = parseCompras(text);
+        comprasState.loaded = true;
+      } catch (e) { return false; }
+    }
+    await mergeGranos();
+    return true;
   }
 
   // Estado de Resultado: Ventas (con precio) vs Compras (neto) vs Sueldos, mensual. Card en Resumen.
