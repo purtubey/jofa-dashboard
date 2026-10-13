@@ -97,8 +97,8 @@ function getCatStore() {
 // Se guardan en Netlify Blobs (clave 'afip_secrets') y se leen en runtime. Solo datos chicos quedan en env.
 const AFIP_CERT_CUIT = process.env.AFIP_CERT_CUIT || '';              // CUIT del certificado (Pulporte) = tax_id en /auth
 const AFIP_JOFA_CUIT = process.env.AFIP_JOFA_CUIT || '30710762372';  // representada (JOFA) = auth.cuit
-const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '1')
-  .split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '0')
+  .split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n >= 0);
 // Nombres aprox de granos (se puede refinar con tipoGranoConsultar). Fallback: "Grano <cod>".
 const GRANOS_NOMBRE = { 2: 'Maíz', 3: 'Soja', 14: 'Trigo', 23: 'Girasol', 29: 'Sorgo', 31: 'Cebada', 34: 'Poroto' };
 
@@ -431,8 +431,10 @@ exports.handler = async (event) => {
     if (action === 'granos_scan') {
       const sec = await getAfipSecrets();
       if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip.' });
-      const from = Math.max(parseInt((params && params.from) || 1, 10) || 1, 0);
-      let to = Math.max(parseInt((params && params.to) || (from + 5), 10) || (from + 5), from);
+      const from = Math.max((params && params.from != null) ? (parseInt(params.from, 10) || 0) : 1, 0);
+      let to = (params && params.to != null) ? parseInt(params.to, 10) : (from + 5);
+      if (isNaN(to)) to = from + 5;
+      if (to < from) to = from;
       if (to - from > 7) to = from + 7; // tope por timeout (~1.5s por punto)
       const cuitRep = (params && params.cuit) ? String(params.cuit) : AFIP_JOFA_CUIT;
       const res = {};
@@ -480,10 +482,12 @@ exports.handler = async (event) => {
           const nro = ret.nroOrden;
           const err = ret.errores && ret.errores.error;
           out.ptoEmis[pe] = { status: r.status, nroOrden: nro != null ? nro : null, errores: err || null };
-          if (!out.sample && nro && Number(nro) > 0) {
+          if (!out.sample && nro != null && Number(nro) >= 0) {
             const r2 = await wslpgRequest('liquidacionXNroOrdenConsultar', { ptoEmision: pe, nroOrden: Number(nro) });
             const lc = (r2.data && (r2.data.liqConsReturn || r2.data)) || {};
-            out.sample = { ptoEmision: pe, nroOrden: Number(nro), normalizado: normLiqGrano(lc, pe, Number(nro)), errores: (lc.errores && lc.errores.error) || null };
+            if (lc.liquidacion || lc.autorizacion) {
+              out.sample = { ptoEmision: pe, nroOrden: Number(nro), normalizado: normLiqGrano(lc, pe, Number(nro)), errores: (lc.errores && lc.errores.error) || null };
+            }
           }
         }
         return J(200, out);
@@ -505,7 +509,7 @@ exports.handler = async (event) => {
           const r = await wslpgRequest('liquidacionUltimoNroOrdenConsultar', { ptoEmision: pe });
           const ret = (r.data && (r.data.liqUltNroOrdenReturn || r.data)) || {};
           const last = Number(ret.nroOrden) || 0;
-          const from = (g.cursor[pe] || 0) + 1;
+          const from = (g.cursor[pe] != null ? g.cursor[pe] : -1) + 1; // nroOrden puede empezar en 0
           progress[pe] = { last: last, desde: from, traidas: 0 };
           for (let n = from; n <= last && fetched < limit; n++) {
             const r2 = await wslpgRequest('liquidacionXNroOrdenConsultar', { ptoEmision: pe, nroOrden: n });
