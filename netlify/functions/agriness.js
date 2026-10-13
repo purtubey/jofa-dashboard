@@ -272,8 +272,12 @@ exports.handler = async (event) => {
     if (action === 'cfg_set') {
       try {
         const store = getCatStore();
-        await store.setJSON('config', params || {});
-        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true }) };
+        // Merge: no pisar otras claves del config (ej. guardar sueldos no debe borrar pormag)
+        let cur = {};
+        try { cur = (await store.get('config', { type: 'json' })) || {}; } catch (e) { cur = {}; }
+        const next = Object.assign({}, cur, params || {});
+        await store.setJSON('config', next);
+        return { statusCode: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true, config: next }) };
       } catch (e) {
         return { statusCode: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: false, error: e.message }) };
       }
