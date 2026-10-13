@@ -426,6 +426,25 @@ exports.handler = async (event) => {
       });
     }
 
+    // Escaner de puntos de emision: prueba un rango y devuelve el ultimo nroOrden de cada uno.
+    if (action === 'granos_scan') {
+      const sec = await getAfipSecrets();
+      if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip.' });
+      const from = Math.max(parseInt((params && params.from) || 1, 10) || 1, 0);
+      let to = Math.max(parseInt((params && params.to) || (from + 5), 10) || (from + 5), from);
+      if (to - from > 7) to = from + 7; // tope por timeout (~1.5s por punto)
+      const res = {};
+      try {
+        for (let pe = from; pe <= to; pe++) {
+          const r = await wslpgRequest('liquidacionUltimoNroOrdenConsultar', { ptoEmision: pe });
+          const ret = (r.data && (r.data.liqUltNroOrdenReturn || r.data)) || {};
+          const err = ret.errores && ret.errores.error;
+          res[pe] = { nroOrden: ret.nroOrden != null ? ret.nroOrden : null, errores: err || null, status: r.status };
+        }
+        return J(200, { ok: true, desde: from, hasta: to, res: res });
+      } catch (e) { return J(200, { ok: false, desde: from, parcial: res, error: e.message }); }
+    }
+
     // Prueba de conexion/delegacion: ultimo nro por ptoEmision + una liquidacion de muestra.
     if (action === 'granos_debug') {
       const sec = await getAfipSecrets();
