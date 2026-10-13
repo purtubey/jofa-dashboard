@@ -449,6 +449,28 @@ exports.handler = async (event) => {
       } catch (e) { return J(200, { ok: false, desde: from, parcial: res, error: e.message }); }
     }
 
+    // Sonda: consulta liquidaciones por (ptoEmision, nroOrden) puntuales para entender la numeracion.
+    if (action === 'granos_nro') {
+      const sec = await getAfipSecrets();
+      if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip.' });
+      const pe = (params && params.pto != null) ? Number(params.pto) : 0;
+      const cuitRep = (params && params.cuit) ? String(params.cuit) : AFIP_JOFA_CUIT;
+      let nros = (params && Array.isArray(params.nros)) ? params.nros : [(params && params.nro != null) ? params.nro : 0];
+      nros = nros.slice(0, 7).map(Number);
+      const out = {};
+      try {
+        for (const n of nros) {
+          const r = await wslpgRequest('liquidacionXNroOrdenConsultar', { ptoEmision: pe, nroOrden: n }, cuitRep);
+          const lc = (r.data && (r.data.liqConsReturn || r.data)) || {};
+          const has = !!(lc.liquidacion || lc.autorizacion);
+          out[n] = has
+            ? { hay: true, coe: (lc.autorizacion && lc.autorizacion.coe) || null, vendedor: (lc.liquidacion && lc.liquidacion.cuitVendedor) || null, neto: (lc.autorizacion && lc.autorizacion.subTotal) || null, fecha: (lc.autorizacion && lc.autorizacion.fechaLiquidacion) || null }
+            : { hay: false, errores: (lc.errores && lc.errores.error) || null };
+        }
+        return J(200, { ok: true, pto: pe, representada: cuitRep, res: out });
+      } catch (e) { return J(200, { ok: false, parcial: out, error: e.message }); }
+    }
+
     // Consulta una liquidacion por COE (revela ptoEmision/nroOrden y confirma la representacion).
     if (action === 'granos_coe') {
       const sec = await getAfipSecrets();
