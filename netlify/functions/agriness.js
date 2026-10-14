@@ -123,32 +123,32 @@ async function getAfipSecrets() {
     cert: pemFix(b.cert || process.env.AFIP_CERT || ''),
     key: pemFix(b.key || process.env.AFIP_KEY || ''),
     token: String(b.token || process.env.AFIPSDK_TOKEN || '').trim(),
+    // Clave fiscal (para automatizaciones que entran al portal ARCA). claveUser = CUIT que loguea (Pablo), clavePass = clave fiscal.
+    claveUser: String(b.claveUser || process.env.AFIP_CLAVE_USER || AFIP_CERT_CUIT || '').trim(),
+    clavePass: String(b.clavePass || '').trim(),
     exp: Date.now() + 5 * 60 * 1000,
   };
   return afipSecretsCache;
 }
 
-function afipPost(path, bodyObj, bearer) {
+// HTTP genérico a Afip SDK (GET o POST) con Bearer.
+function afipHttp(method, path, bodyObj, bearer) {
   return new Promise((resolve, reject) => {
-    const payload = JSON.stringify(bodyObj);
-    const options = {
-      hostname: 'app.afipsdk.com', port: 443, path: path, method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (bearer || ''),
-        'Content-Length': Buffer.byteLength(payload),
-      },
-    };
-    const req = https.request(options, (res) => {
+    const payload = bodyObj ? JSON.stringify(bodyObj) : null;
+    const headers = { 'Authorization': 'Bearer ' + (bearer || '') };
+    if (payload) { headers['Content-Type'] = 'application/json'; headers['Content-Length'] = Buffer.byteLength(payload); }
+    const req = https.request({ hostname: 'app.afipsdk.com', port: 443, path: path, method: method, headers: headers }, (res) => {
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => { try { resolve({ status: res.statusCode, data: JSON.parse(data) }); } catch { resolve({ status: res.statusCode, data: data }); } });
     });
     req.on('error', reject);
     req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout Afip SDK')); });
-    req.write(payload); req.end();
+    if (payload) req.write(payload);
+    req.end();
   });
 }
+function afipPost(path, bodyObj, bearer) { return afipHttp('POST', path, bodyObj, bearer); }
 
 async function getWslpgTA(force) {
   if (!force && wslpgTA && Date.now() < wslpgTA.exp) return wslpgTA;
@@ -536,6 +536,60 @@ exports.handler = async (event) => {
     if (action === 'granos_coes_get') {
       try { const c = (await getCatStore().get('granos_coes', { type: 'json' })) || { coes: [] }; return J(200, { coes: c.coes || [] }); }
       catch (e) { return J(200, { coes: [], _error: e.message }); }
+    }
+
+    // Guarda la clave fiscal (para automatizaciones). Secreta: se carga via snippet, va a Blobs 'afip_secrets'.
+    if (action === 'granos_clave_set') {
+      try {
+        const p = params || {};
+        if (!p.clavePass) return J(200, { ok: false, error: 'Mandar clavePass (clave fiscal); claveUser opcional (default = CUIT del cert).' });
+        const store = getCatStore();
+        let cur = {};
+        try { cur = (await store.get('afip_secrets', { type: 'json' })) || {}; } catch (e) { cur = {}; }
+        cur.claveUser = p.claveUser ? String(p.claveUser).trim() : (cur.claveUser || AFIP_CERT_CUIT);
+        cur.clavePass = String(p.clavePass).trim();
+        await store.setJSON('afip_secrets', cur);
+        afipSecretsCache = null;
+        return J(200, { ok: true, claveUser: cur.claveUser, clavePassLargo: cur.clavePass.length });
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
+    }
+
+    // Dispara la automatizacion de liquidaciones RECIBIDAS (portal ARCA). Devuelve el id para pollear.
+    if (action === 'granos_recibidas_run') {
+      try {
+        const s = await getAfipSecrets();
+        if (!s.token) return J(200, { ok: false, error: 'Falta AFIPSDK_TOKEN.' });
+        if (!s.clavePass) return J(200, { ok: false, error: 'Falta clave fiscal; usar granos_clave_set.' });
+        const f = (params && params.filters) || {};
+        const filters = {};
+        if (f.fecha_desde) filters.fecha_desde = String(f.fecha_desde);
+        if (f.fecha_hasta) filters.fecha_hasta = String(f.fecha_hasta);
+        if (f.coe) filters.coe = String(f.coe);
+        if (f.cuit_emisor) filters.cuit_emisor = String(f.cuit_emisor);
+        const body = {
+          automation: 'lpg-liquidaciones-recibidas',
+          params: { cuit: String(AFIP_JOFA_CUIT), username: String(s.claveUser), password: s.clavePass, filters: filters },
+        };
+        const r = await afipHttp('POST', '/api/v1/automations', body, s.token);
+        const id = r.data && (r.data.id || (r.data.data && r.data.data.id));
+        return J(200, { ok: !!id, id: id || null, status: (r.data && r.data.status) || null, httpStatus: r.status, raw: id ? undefined : r.data });
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
+    }
+
+    // Lee el resultado de una automatizacion por id (pollear hasta status != in_process).
+    if (action === 'granos_recibidas_result') {
+      try {
+        const s = await getAfipSecrets();
+        const id = params && params.id;
+        if (!id) return J(200, { ok: false, error: 'Falta id.' });
+        const r = await afipHttp('GET', '/api/v1/automations/' + encodeURIComponent(id), null, s.token);
+        const d = r.data || {};
+        const status = d.status || null;
+        if (status && status !== 'complete') return J(200, { ok: true, status: status, id: id });
+        const liqs = (d.data && Array.isArray(d.data.liquidaciones)) ? d.data.liquidaciones : [];
+        const coes = liqs.map((x) => String(x.coe)).filter(Boolean);
+        return J(200, { ok: true, status: status, total: (d.data && d.data.total) || liqs.length, coes: coes, liquidaciones: liqs });
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
     }
 
     // Sincroniza: baja por COE las liquidaciones de la lista que todavia no estan cacheadas. Guarda en Blobs 'granos'.
