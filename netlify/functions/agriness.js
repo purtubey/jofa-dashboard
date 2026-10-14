@@ -482,12 +482,14 @@ exports.handler = async (event) => {
         const r = await wslpgRequest('liquidacionXCoeConsultar', { coe: Number(coe), pdf: 'N' }, cuitRep);
         const lc = (r.data && (r.data.liqConsReturn || r.data)) || {};
         const L = lc.liquidacion || {};
+        const A = lc.autorizacion || {};
         const err = (lc.errores && lc.errores.error) || null;
         return J(200, {
           ok: true, representada: cuitRep, status: r.status, errores: err,
-          ptoEmision: L.ptoEmision != null ? L.ptoEmision : null, nroOrden: L.nroOrden != null ? L.nroOrden : null,
+          liquidacion_pto_nro: { ptoEmision: L.ptoEmision != null ? L.ptoEmision : null, nroOrden: L.nroOrden != null ? L.nroOrden : null },
+          autorizacion_pto_nro: { ptoEmision: A.ptoEmision != null ? A.ptoEmision : null, nroOrden: A.nroOrden != null ? A.nroOrden : null, nroOpComercial: A.nroOpComercial != null ? A.nroOpComercial : null, estado: A.estado || null, coe: A.coe || null },
           cuitComprador: L.cuitComprador || null, cuitVendedor: L.cuitVendedor || null,
-          normalizado: (lc.liquidacion || lc.autorizacion) ? normLiqGrano(lc, L.ptoEmision, L.nroOrden) : null,
+          normalizado: (lc.liquidacion || lc.autorizacion) ? normLiqGrano(lc, A.ptoEmision != null ? A.ptoEmision : L.ptoEmision, A.nroOrden != null ? A.nroOrden : L.nroOrden) : null,
         });
       } catch (e) { return J(200, { ok: false, error: e.message }); }
     }
