@@ -100,7 +100,7 @@ const AFIP_JOFA_CUIT = process.env.AFIP_JOFA_CUIT || '30710762372';  // represen
 const AFIP_WSLPG_PTOEMIS = (process.env.AFIP_WSLPG_PTOEMIS || '0')
   .split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n >= 0);
 // Nombres aprox de granos (se puede refinar con tipoGranoConsultar). Fallback: "Grano <cod>".
-const GRANOS_NOMBRE = { 2: 'Maíz', 3: 'Soja', 14: 'Trigo', 23: 'Girasol', 29: 'Sorgo', 31: 'Cebada', 34: 'Poroto' };
+const GRANOS_NOMBRE = { 2: 'Maíz', 3: 'Soja', 14: 'Trigo', 19: 'Maíz', 23: 'Girasol', 29: 'Sorgo', 31: 'Cebada', 34: 'Poroto' };
 
 // PEM: normaliza saltos de linea (\n literal o CRLF) para que el cert/key sean PEM validos.
 function pemFix(s) {
@@ -518,35 +518,56 @@ exports.handler = async (event) => {
       } catch (e) { return J(200, { ok: false, error: e.message }); }
     }
 
-    // Sincroniza nuevas liquidaciones (incremental, con tope para no exceder el timeout). Guarda en Blobs 'granos'.
-    if (action === 'granos_sync') {
-      { const sec = await getAfipSecrets(); if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip (cert/key/token via granos_secrets_set) o AFIP_CERT_CUIT.' }); }
+    // Guarda/agrega la lista de COEs de liquidaciones (merge). La lista sale del portal ARCA (Consulta de Solicitudes emitidas, por fecha).
+    if (action === 'granos_coes_set') {
       try {
-        const limit = Math.min(Math.max(parseInt((params && params.limit) || 8, 10) || 8, 1), 25);
+        const list = (params && Array.isArray(params.coes)) ? params.coes.map(String).filter(Boolean) : [];
+        if (!list.length) return J(200, { ok: false, error: 'Mandar coes: [ ... ].' });
         const store = getCatStore();
-        let g = (await store.get('granos', { type: 'json' })) || { updated: null, items: [], cursor: {} };
+        let cur = {};
+        try { cur = (await store.get('granos_coes', { type: 'json' })) || {}; } catch (e) { cur = {}; }
+        const set = new Set((cur.coes || []).map(String));
+        list.forEach((c) => set.add(String(c)));
+        const merged = [...set];
+        await store.setJSON('granos_coes', { coes: merged });
+        return J(200, { ok: true, total: merged.length, agregados: merged.length - (cur.coes ? cur.coes.length : 0) });
+      } catch (e) { return J(200, { ok: false, error: e.message }); }
+    }
+    if (action === 'granos_coes_get') {
+      try { const c = (await getCatStore().get('granos_coes', { type: 'json' })) || { coes: [] }; return J(200, { coes: c.coes || [] }); }
+      catch (e) { return J(200, { coes: [], _error: e.message }); }
+    }
+
+    // Sincroniza: baja por COE las liquidaciones de la lista que todavia no estan cacheadas. Guarda en Blobs 'granos'.
+    if (action === 'granos_sync') {
+      { const sec = await getAfipSecrets(); if (!sec.token || !sec.cert || !sec.key || !AFIP_CERT_CUIT) return J(200, { ok: false, error: 'Faltan secretos Afip (via granos_secrets_set) o AFIP_CERT_CUIT.' }); }
+      try {
+        const limit = Math.min(Math.max(parseInt((params && params.limit) || 10, 10) || 10, 1), 25);
+        const store = getCatStore();
+        const coesObj = (await store.get('granos_coes', { type: 'json' })) || { coes: [] };
+        const coes = (coesObj.coes || []).map(String);
+        let g = (await store.get('granos', { type: 'json' })) || { updated: null, items: [] };
         if (!Array.isArray(g.items)) g.items = [];
-        if (!g.cursor) g.cursor = {};
-        const idx = {}; g.items.forEach((it) => { idx[it.ptoEmision + '-' + it.nroOrden] = true; });
-        let fetched = 0; const progress = {};
-        for (const pe of AFIP_WSLPG_PTOEMIS) {
-          const r = await wslpgRequest('liquidacionUltimoNroOrdenConsultar', { ptoEmision: pe });
-          const ret = (r.data && (r.data.liqUltNroOrdenReturn || r.data)) || {};
-          const last = Number(ret.nroOrden) || 0;
-          const from = (g.cursor[pe] != null ? g.cursor[pe] : -1) + 1; // nroOrden puede empezar en 0
-          progress[pe] = { last: last, desde: from, traidas: 0 };
-          for (let n = from; n <= last && fetched < limit; n++) {
-            const r2 = await wslpgRequest('liquidacionXNroOrdenConsultar', { ptoEmision: pe, nroOrden: n });
-            const lc = (r2.data && (r2.data.liqConsReturn || r2.data)) || {};
-            if (lc && (lc.autorizacion || lc.liquidacion)) {
-              if (!idx[pe + '-' + n]) { g.items.push(normLiqGrano(lc, pe, n)); idx[pe + '-' + n] = true; progress[pe].traidas++; }
-            }
-            g.cursor[pe] = n; fetched++;
+        const have = new Set(g.items.map((x) => String(x.coe)));
+        const pend = coes.filter((c) => !have.has(String(c)));
+        let fetched = 0, traidas = 0; const errores = [];
+        for (const coe of pend) {
+          if (fetched >= limit) break;
+          fetched++;
+          const r = await wslpgRequest('liquidacionXCoeConsultar', { coe: Number(coe), pdf: 'N' });
+          const lc = (r.data && (r.data.liqConsReturn || r.data)) || {};
+          if (lc.liquidacion || lc.autorizacion) {
+            const A = lc.autorizacion || {};
+            const norm = normLiqGrano(lc, A.ptoEmision, A.nroOrden);
+            norm.coe = Number(coe);
+            g.items.push(norm); traidas++;
+          } else {
+            errores.push({ coe: coe, err: (lc.errores && lc.errores.error) || 'sin datos' });
           }
         }
         g.updated = new Date().toISOString();
         await store.setJSON('granos', g);
-        return J(200, { ok: true, fetched: fetched, total: g.items.length, progress: progress, updated: g.updated });
+        return J(200, { ok: true, consultadas: fetched, nuevas: traidas, pendientes: Math.max(pend.length - fetched, 0), total: g.items.length, errores: errores, updated: g.updated });
       } catch (e) { return J(200, { ok: false, error: e.message }); }
     }
 
