@@ -2542,7 +2542,7 @@ out.push({ month: period, value: k.value });
       const d = await r.json();
       const items = (d && Array.isArray(d.items)) ? d.items : [];
       comprasState.granosUpdated = d && d.updated;
-      const rows = items.filter(x => String(x.estado || '').toUpperCase() !== 'ANULADA').map(x => ({
+      const rows = items.filter(x => { const e = String(x.estado || '').toUpperCase(); return e !== 'AN' && e !== 'ANULADA'; }).map(x => ({
         fecha: x.fecha || '', mes: x.mes || String(x.fecha || '').slice(0, 7),
         tipo: 'Liquidación granos' + (x.grano ? ' (' + x.grano + ')' : ''),
         numero: String(x.nroOrden || ''), pv: String(x.ptoEmision || ''),
