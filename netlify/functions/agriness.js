@@ -585,7 +585,7 @@ exports.handler = async (event) => {
         const r = await afipHttp('GET', '/api/v1/automations/' + encodeURIComponent(id), null, s.token);
         const d = r.data || {};
         const status = d.status || null;
-        if (status && status !== 'complete') return J(200, { ok: true, status: status, id: id });
+        if (status && status !== 'complete') return J(200, { ok: true, status: status, id: id, detalle: d.error || d.message || d.data || d });
         const liqs = (d.data && Array.isArray(d.data.liquidaciones)) ? d.data.liquidaciones : [];
         const coes = liqs.map((x) => String(x.coe)).filter(Boolean);
         return J(200, { ok: true, status: status, total: (d.data && d.data.total) || liqs.length, coes: coes, liquidaciones: liqs });
