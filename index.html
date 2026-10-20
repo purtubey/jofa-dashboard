@@ -691,12 +691,13 @@ body {
     <div class="section">
       <div class="section-title">Resultado del mes (parcial)</div>
       <div class="kpi-grid" id="kpi-resumen-resultado">
-        <div class="kpi-card kpi-expandable" id="kpi-estado-resultado"><div class="kpi-label">Resultado del mes (parcial)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Resultado del mes (parcial)</div><div class="tt-desc">Resultado parcial del mes: ventas (con precio cargado) menos compras (neto) menos sueldos. Click para ver la evolucion mensual.</div><div class="tt-calc">Calculo: Ventas - Compras (neto) - Sueldos. PARCIAL: las compras aun no incluyen granos y los sueldos son solo brutos (sin cargas patronales). No es el resultado final.</div><div class="tt-ref">Verde = positivo. Se completa al sumar granos y cargas sociales (F.931).</div></div></div>
+        <div class="kpi-card kpi-expandable" id="kpi-estado-resultado"><div class="kpi-label">Resultado del mes (parcial)</div><div class="kpi-value loading">--</div><div class="kpi-bench"></div><div class="kpi-tooltip"><div class="tt-title">Resultado del mes (parcial)</div><div class="tt-desc">Resultado parcial del mes: ventas menos compras (neto, sin granos) menos el maiz por consumo estimado menos sueldos. Click para ver la evolucion mensual.</div><div class="tt-calc">Calculo: Ventas - Compras (neto, sin granos) - Maiz (consumo estimado) - Sueldos. El maiz entra por CONSUMO mensualizado (no por compra real, que es irregular). PARCIAL: los sueldos son solo brutos (faltan cargas patronales F.931).</div><div class="tt-ref">Verde = positivo. Se completa al sumar granos y cargas sociales (F.931).</div></div></div>
         <div class="expand-panel" id="panel-estado-resultado">
           <div class="stock-loading" id="panel-er-loading">Cargando estado de resultado...</div>
           <div id="panel-er-content" style="display:none;">
             <h4>Ventas vs Compras vs Sueldos &mdash; mensual (desde carga de precios)</h4>
             <div id="er-sueldos-ctrl" style="margin:0 0 10px;font-size:12px;color:var(--text-2);"></div>
+            <div id="er-maiz-ctrl" style="margin:0 0 10px;font-size:12px;color:var(--text-2);"></div>
             <div id="panel-er-table"></div>
           </div>
         </div>
@@ -1973,6 +1974,10 @@ out.push({ month: period, value: k.value });
   let VENTAS_PORMAG_UPDATED = '';         // fecha de ultima actualizacion del piso
   let SUELDOS_MES = {};                   // sueldos (brutos Libro Ley) por mes: { '2026-09': 31022697, ... }. Compartido.
   let CARGAS_MES = {};                    // cargas patronales (F.931) por mes. Pendiente de carga; cuando exista, completa el Costo Laboral.
+  // Maiz: costo por CONSUMO (no por compra). El consumo es parejo (misma cantidad de cerdos); las compras son irregulares.
+  let MAIZ_CONSUMO_ANUAL = 5000;         // toneladas/anio de maiz consumidas. Editable/compartido.
+  let MAIZ_PIZARRA = 281800;             // $/tn pizarra BCR (Camara Arbitral, Rosario). Editable/compartido.
+  let MAIZ_FLETE = 35000;                // $/tn de flete Salta->Rosario que NO se paga (se resta a la pizarra).
   let pormagCfgLoaded = false;
   async function loadPormagCfg() {
     try {
@@ -1983,8 +1988,20 @@ out.push({ month: period, value: k.value });
       if (d && d.pormagUpdated) VENTAS_PORMAG_UPDATED = d.pormagUpdated;
       if (d && d.sueldos && typeof d.sueldos === 'object') SUELDOS_MES = d.sueldos;
       if (d && d.cargas && typeof d.cargas === 'object') CARGAS_MES = d.cargas;
+      if (d && d.maizConsumo && !isNaN(+d.maizConsumo)) MAIZ_CONSUMO_ANUAL = +d.maizConsumo;
+      if (d && d.maizPizarra && !isNaN(+d.maizPizarra)) MAIZ_PIZARRA = +d.maizPizarra;
+      if (d && d.maizFlete != null && !isNaN(+d.maizFlete)) MAIZ_FLETE = +d.maizFlete;
     } catch (e) {}
   }
+  // ---- Maiz: costo por consumo mensualizado ----
+  function diasEnMes(ym) { const p = ym.split('-').map(Number); return new Date(p[0], p[1], 0).getDate(); }
+  function diasEnAnio(y) { return ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365; }
+  // Toneladas de maiz consumidas en el mes (prorrateo por dias).
+  function maizConsumoTn(ym) { const y = +ym.slice(0, 4); return (MAIZ_CONSUMO_ANUAL / diasEnAnio(y)) * diasEnMes(ym); }
+  // Precio neto por tn usado (pizarra menos flete que no se paga).
+  function maizPrecioNeto() { return Math.max(MAIZ_PIZARRA - MAIZ_FLETE, 0); }
+  // Costo de consumo de maiz del mes.
+  function maizCostoMes(ym) { return maizConsumoTn(ym) * maizPrecioNeto(); }
   // Guarda el mapa de sueldos completo (merge en server). Devuelve la promesa del fetch.
   function saveSueldos() {
     return fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cfg_set', params: { sueldos: SUELDOS_MES } }) });
@@ -2822,20 +2839,22 @@ out.push({ month: period, value: k.value });
       } catch (e) { comprasState.ventasMes = {}; }
       comprasState.ventasMesLoaded = true;
     }
+    // Compras del Resultado: facturas AFIP SIN los granos (el maiz entra por consumo estimado, no por compra real).
     const cm = {};
-    (comprasState.rows || []).forEach(r => { cm[r.mes] = (cm[r.mes] || 0) + r.neto; });
+    (comprasState.rows || []).forEach(r => { if (r.origen === 'granos') return; cm[r.mes] = (cm[r.mes] || 0) + r.neto; });
     comprasState.erCompras = cm;
     const m = curMonthStr();
     const v = (comprasState.ventasMes && comprasState.ventasMes[m]) || 0;
     const c = cm[m] || 0;
+    const mz = maizCostoMes(m);
     const s = (SUELDOS_MES && +SUELDOS_MES[m]) || 0;
-    const res = v - c - s;
+    const res = v - c - mz - s;
     setKpi('kpi-estado-resultado', fmtMoneyShort(res), null, null, true);
     const card = document.getElementById('kpi-estado-resultado');
     if (card) {
       const vEl = card.querySelector('.kpi-value'); if (vEl) vEl.style.color = res >= 0 ? 'var(--green)' : 'var(--red)';
       const b = card.querySelector('.kpi-bench');
-      if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Ventas ' + fmtMoneyShort(v) + ' &minus; Compras ' + fmtMoneyShort(c) + (s ? ' &minus; Sueldos ' + fmtMoneyShort(s) : '') + '</span>';
+      if (b) b.innerHTML = '<span style="font-size:11px;color:var(--text-3);">Ventas ' + fmtMoneyShort(v) + ' &minus; Compras ' + fmtMoneyShort(c) + ' &minus; Maiz ' + fmtMoneyShort(mz) + (s ? ' &minus; Sueldos ' + fmtMoneyShort(s) : '') + '</span>';
     }
     renderCostoLaboral(m, s);
   }
@@ -2865,13 +2884,14 @@ out.push({ month: period, value: k.value });
     const vm = comprasState.ventasMes || {}, cm = comprasState.erCompras || {};
     const startMes = VENTAS_PRICE_START.slice(0, 7);
     const meses = Array.from(new Set(Object.keys(vm).concat(Object.keys(cm)))).filter(x => x >= startMes).sort().reverse();
-    let h = '<table><thead><tr><th>Mes</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">Compras (neto)</th><th style="text-align:right;">Sueldos</th><th style="text-align:right;">Resultado</th><th style="text-align:right;">Margen</th></tr></thead><tbody>';
+    let h = '<table><thead><tr><th>Mes</th><th style="text-align:right;">Ventas</th><th style="text-align:right;">Compras (neto)</th><th style="text-align:right;">Maiz (consumo)</th><th style="text-align:right;">Sueldos</th><th style="text-align:right;">Resultado</th><th style="text-align:right;">Margen</th></tr></thead><tbody>';
     meses.forEach(mm => {
-      const v = vm[mm] || 0, c = cm[mm] || 0, s = (SUELDOS_MES && +SUELDOS_MES[mm]) || 0, res = v - c - s;
+      const v = vm[mm] || 0, c = cm[mm] || 0, mz = maizCostoMes(mm), s = (SUELDOS_MES && +SUELDOS_MES[mm]) || 0, res = v - c - mz - s;
       const margen = v ? (res / v * 100) : null;
       h += '<tr><td>' + monthLabel(mm + '-01') + '</td>'
         + '<td style="text-align:right;">' + fmtMoneyShort(v) + '</td>'
         + '<td style="text-align:right;">' + fmtMoneyShort(c) + '</td>'
+        + '<td style="text-align:right;color:var(--text-1);" title="' + fmtNum(maizConsumoTn(mm), 0) + ' tn x ' + fmtMoney(maizPrecioNeto()) + '/tn">' + fmtMoneyShort(mz) + '</td>'
         + '<td style="text-align:right;color:' + (s ? 'var(--text-1)' : 'var(--text-3)') + ';">' + (s ? fmtMoneyShort(s) : '&mdash;') + '</td>'
         + '<td style="text-align:right;font-weight:700;color:' + (res >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + fmtMoneyShort(res) + '</td>'
         + '<td style="text-align:right;color:var(--text-2);">' + (margen != null ? fmtNum(margen, 0) + '%' : '--') + '</td></tr>';
@@ -2880,8 +2900,33 @@ out.push({ month: period, value: k.value });
     if (meses.length === 0) h = '<div class="table-empty">Sin datos</div>';
     document.getElementById('panel-er-table').innerHTML = h;
     renderSueldosCtrl(meses);
+    renderMaizCtrl();
     if (loading) loading.style.display = 'none';
     if (content) content.style.display = 'block';
+  }
+
+  // Editor del costo de maiz por consumo (compartido via config). Pizarra, flete y consumo anual.
+  function renderMaizCtrl() {
+    const el = document.getElementById('er-maiz-ctrl'); if (!el) return;
+    const inp = (id, val, w) => '<input id="' + id + '" type="number" value="' + val + '" style="width:' + (w || 95) + 'px;background:var(--bg-2);color:var(--text-0);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">';
+    el.innerHTML = '<span style="color:var(--text-2);">Maiz &mdash; consumo</span> ' + inp('maiz-consumo', MAIZ_CONSUMO_ANUAL, 70) + ' tn/anio'
+      + ' &middot; pizarra $ ' + inp('maiz-pizarra', MAIZ_PIZARRA) + '/tn'
+      + ' &minus; flete $ ' + inp('maiz-flete', MAIZ_FLETE, 80) + '/tn'
+      + ' <button id="maiz-save" style="background:var(--blue);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Guardar</button>'
+      + ' <span id="maiz-status" style="margin-left:6px;font-size:11px;color:var(--text-3);"></span>'
+      + '<div style="margin-top:4px;font-size:11px;color:var(--text-3);">Costo = (consumo/365 &times; dias del mes) &times; (pizarra &minus; flete). Neto actual: ' + fmtMoney(maizPrecioNeto()) + '/tn. Reemplaza las compras reales de grano en el Resultado.</div>';
+    const btn = document.getElementById('maiz-save');
+    if (btn) btn.addEventListener('click', function () {
+      const cons = parseFloat(document.getElementById('maiz-consumo').value);
+      const piz = parseFloat(document.getElementById('maiz-pizarra').value);
+      const fle = parseFloat(document.getElementById('maiz-flete').value);
+      if (isNaN(cons) || cons <= 0 || isNaN(piz) || piz <= 0 || isNaN(fle) || fle < 0) { alert('Valores invalidos'); return; }
+      MAIZ_CONSUMO_ANUAL = cons; MAIZ_PIZARRA = piz; MAIZ_FLETE = fle;
+      const st = document.getElementById('maiz-status'); if (st) st.textContent = 'Guardando...';
+      fetch('/api/agriness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cfg_set', params: { maizConsumo: cons, maizPizarra: piz, maizFlete: fle } }) })
+        .then(function (r) { if (st) st.textContent = r.ok ? ('guardado ' + fmtDate(today())) : 'error al guardar'; loadEstadoResultado(); loadEstadoResultadoPanel(); })
+        .catch(function () { if (st) st.textContent = 'error al guardar'; });
+    });
   }
 
   // Editor de sueldos (brutos del Libro Ley) por mes. Compartido via config (Blobs).
